@@ -1,0 +1,13 @@
+node_modules/
+.next/
+.env
+prisma/*.db
+prisma/*.db-journal
+storage/
+.wrangler/
+.open-next/
+
+# 业务原始数据与本地生成文档不提交到代码仓库
+商家数据源（每日更新）/
+广西外卖竞争态势分析工具-第一版设计说明.docx
+docx-render/

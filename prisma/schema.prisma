@@ -1,0 +1,76 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model MasterDataVersion {
+  id          String               @id @default(cuid())
+  importedAt  DateTime             @default(now())
+  isActive    Boolean              @default(true)
+  assignments MerchantAssignment[]
+
+  @@index([isActive, importedAt])
+}
+
+model MerchantAssignment {
+  id            String            @id @default(cuid())
+  merchantId    String
+  merchantName  String
+  city          String
+  bdName        String
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  versionId     String
+  version       MasterDataVersion @relation(fields: [versionId], references: [id])
+
+  @@index([city, merchantId])
+  @@index([merchantId, effectiveFrom])
+}
+
+model Upload {
+  id         String              @id @default(cuid())
+  imagePath  String
+  imageHash  String              @unique
+  imageAccessToken String         @unique
+  uploadedAt DateTime            @default(now())
+  order      OrderRecord?
+  failure    RecognitionFailure?
+}
+
+model OrderRecord {
+  id          String @id @default(cuid())
+  uploadId    String @unique
+  upload      Upload @relation(fields: [uploadId], references: [id])
+  orderNumber String @unique
+  platform    String
+  merchantId  String
+  merchantName String @default("")
+  city        String
+  bdName      String
+  uploadedAt  DateTime @default(now())
+  dishPrice Float
+  packagingFee Float
+  platformRedPacket Float
+  originalDeliveryFee Float
+  deliveryFeeReduction Float
+  paidDeliveryFee Float
+  merchantSettlementAmount Float
+  userPaidAmount Float
+  otherPromotion Float
+  technicalServiceFee Float
+  deliveryServiceFee Float
+  merchantRate Float
+}
+
+model RecognitionFailure {
+  id        String @id @default(cuid())
+  uploadId  String @unique
+  upload    Upload @relation(fields: [uploadId], references: [id])
+  reason    String
+  createdAt DateTime @default(now())
+}
