@@ -33,9 +33,10 @@ model MerchantAssignment {
 }
 
 model Upload {
-  id         String              @id @default(cuid())
-  imagePath  String
-  imageHash  String              @unique
+  id            String              @id @default(cuid())
+  imageData     Bytes
+  imageMimeType String
+  imageHash     String              @unique
   imageAccessToken String         @unique
   uploadedAt DateTime            @default(now())
   order      OrderRecord?

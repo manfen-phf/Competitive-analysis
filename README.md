@@ -12,11 +12,11 @@
 
 ## 第一次运行
 
-1. 将 `.env.example` 复制为 `.env`，至少设置 `ADMIN_IMPORT_PASSCODE`；启用实际图片识别时设置 `AGNES_API_KEY` 与已部署应用的 `PUBLIC_APP_URL`。
+1. 将 `.env.example` 复制为 `.env`，至少设置 `ADMIN_IMPORT_PASSCODE`；启用实际图片识别时设置 `AGNES_API_KEY`。
 2. 执行 `pnpm exec prisma db push`。
 3. 执行 `pnpm dev`，打开 `http://localhost:3000`。
 4. 到“主数据导入”页面导入 Excel。若当前日更数据没有“生效开始日”列，填写本次导入的生效开始日即可。
 
 ## 当前待接入项
 
-真实订单截图识别服务使用 Agnes 2.0 Flash。Agnes 要求从公网 URL 读取图片，因此需先将应用部署到可访问的地址并在 `.env` 配置 `AGNES_API_KEY` 与 `PUBLIC_APP_URL`。未配置时上传会明确失败，不会写入订单数据。
+真实订单截图识别服务使用 Agnes 2.0 Flash。Agnes 通过应用当前的公网请求地址读取带令牌保护的截图；截图存入 D1，不需要 R2。单张 PNG、JPG 或 WebP 截图不得超过 1.8MB。未配置 `AGNES_API_KEY` 时上传会明确失败，不会写入订单数据。

@@ -3,7 +3,7 @@ import { getPrisma } from "@/lib/db";
 import { imageHash } from "@/lib/dedup";
 import { recognizeOrderScreenshot } from "@/lib/ocr";
 import { validateRecognition } from "@/lib/validation";
-import { publicUploadImageUrl, saveUploadImage } from "@/lib/storage";
+import { assertSupportedScreenshot, publicUploadImageUrl } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 
 export async function POST(request: NextRequest) {
@@ -20,12 +20,11 @@ export async function POST(request: NextRequest) {
   });
   if (!assignment) return NextResponse.json({ error: "所选商家不在当前城市，或上传日期未匹配到有效的 BD 归属" }, { status: 400 });
   const bytes = Buffer.from(await file.arrayBuffer()); const hash = imageHash(bytes);
+  try { assertSupportedScreenshot(bytes, file.type); } catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "截图不符合要求" }, { status: 400 }); }
   if (await prisma.upload.findUnique({ where: { imageHash: hash } })) return NextResponse.json({ error: "重复截图，未计入数据" }, { status: 409 });
-  const upload = await prisma.upload.create({ data: { imageHash: hash, imagePath: "", imageAccessToken: randomUUID() } });
+  const upload = await prisma.upload.create({ data: { imageHash: hash, imageData: bytes, imageMimeType: file.type, imageAccessToken: randomUUID() } });
   try {
-    const imagePath = await saveUploadImage(upload.id, bytes, file.type);
-    await prisma.upload.update({ where: { id: upload.id }, data: { imagePath } });
-    const recognition = await recognizeOrderScreenshot(publicUploadImageUrl(upload.id, upload.imageAccessToken));
+    const recognition = await recognizeOrderScreenshot(publicUploadImageUrl(request.nextUrl.origin, upload.id, upload.imageAccessToken));
     const validation = validateRecognition(recognition);
     if (!validation.ok) throw new Error(validation.reason);
     const { confidence: _confidence, ...orderFields } = recognition;
