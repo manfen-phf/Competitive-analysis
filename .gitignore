@@ -6,6 +6,7 @@ prisma/*.db-journal
 storage/
 .wrangler/
 .open-next/
+.worktrees/
 
 # 业务原始数据与本地生成文档不提交到代码仓库
 商家数据源（每日更新）/
