@@ -1,9 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { getPrisma } from "../../src/lib/db";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 describe("database", () => {
+  let getPrisma: typeof import("../../src/lib/db").getPrisma;
+
+  beforeAll(async () => {
+    process.env.DATABASE_URL = "file:./dev.db";
+    ({ getPrisma } = await import("../../src/lib/db"));
+  });
+
   it("connects to the local SQLite database", async () => {
     const prisma = await getPrisma();
     await expect(prisma.$queryRaw`SELECT 1`).resolves.toBeTruthy();
