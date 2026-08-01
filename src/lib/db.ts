@@ -1,19 +1,25 @@
-import { PrismaD1 } from "@prisma/adapter-d1";
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import type { D1Database } from "@cloudflare/workers-types";
 
-declare global { interface CloudflareEnv { DB?: D1Database } }
+declare global {
+  var __prisma: PrismaClient | undefined;
+  interface CloudflareEnv { DB?: D1Database; }
+}
 
-const localPrisma = globalThis.__prisma ?? new PrismaClient();
-if (process.env.NODE_ENV !== "production") globalThis.__prisma = localPrisma;
-
-export async function getPrisma() {
+export async function getPrisma(): Promise<PrismaClient> {
+  const { PrismaClient } = await import("@prisma/client");
   try {
     const { getCloudflareContext } = await import("@opennextjs/cloudflare");
     const { env } = await getCloudflareContext({ async: true });
-    if (env.DB) return new PrismaClient({ adapter: new PrismaD1(env.DB) });
-  } catch { /* Local Next.js development uses SQLite. */ }
+    if (env.DB) {
+      const { PrismaD1 } = await import("@prisma/adapter-d1");
+      return new PrismaClient({ adapter: new PrismaD1(env.DB) });
+    }
+  } catch {
+    // Local tooling uses the SQLite client below.
+  }
+
+  const localPrisma = globalThis.__prisma ?? new PrismaClient();
+  if (process.env.NODE_ENV !== "production") globalThis.__prisma = localPrisma;
   return localPrisma;
 }
-
-declare global { var __prisma: PrismaClient | undefined; }
