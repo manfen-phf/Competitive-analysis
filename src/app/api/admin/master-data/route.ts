@@ -11,7 +11,16 @@ export async function POST(request: NextRequest) {
   if (!passcode) {
     return NextResponse.json({ error: "服务端未配置管理员口令，请联系管理员" }, { status: 503 });
   }
-  if (form.get("passcode") !== passcode) return NextResponse.json({ error: "管理员口令错误" }, { status: 401 });
+  if (form.get("passcode") !== passcode) {
+    return NextResponse.json(
+      {
+        error: "管理员口令错误",
+        expectedLength: passcode.length,
+        receivedLength: String(form.get("passcode") ?? "").length,
+      },
+      { status: 401 },
+    );
+  }
   const file = form.get("file");
   const effectiveFromText = String(form.get("effectiveFrom") ?? "");
   const defaultEffectiveFrom = effectiveFromText ? new Date(`${effectiveFromText}T00:00:00+08:00`) : undefined;
