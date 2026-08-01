@@ -10,4 +10,14 @@ describe("workspace foundation", () => {
     expect(css).toContain("prefers-reduced-motion");
     expect(css).toContain("--surface-focus");
   });
+
+  it("mounts a navigable workspace rail and command entry point", () => {
+    const shell = readFileSync(
+      join(process.cwd(), "src/components/workspace/workspace-shell.tsx"),
+      "utf8",
+    );
+
+    expect(shell).toContain("WorkspaceRail");
+    expect(shell).toContain("CommandPalette");
+  });
 });
