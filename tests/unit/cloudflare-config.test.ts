@@ -10,4 +10,10 @@ describe("Cloudflare Prisma configuration", () => {
     expect(config).toContain('"@prisma/client"');
     expect(config).toContain('".prisma/client"');
   });
+
+  it("generates Prisma Client before the Cloudflare build runs", () => {
+    const packageJson = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8"));
+
+    expect(packageJson.scripts.prebuild).toBe("prisma generate");
+  });
 });
