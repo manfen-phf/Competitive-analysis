@@ -1,8 +1,7 @@
-import { getCloudflareContext } from "@opennextjs/cloudflare";
-
 export async function getRuntimeSecret(name: string): Promise<string | undefined> {
   try {
-    const { env } = getCloudflareContext();
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const { env } = await getCloudflareContext({ async: true });
     const value = (env as Record<string, unknown>)[name];
     if (typeof value === "string" && value.length > 0) return value;
   } catch {
