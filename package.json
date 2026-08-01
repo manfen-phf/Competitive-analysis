@@ -1,36 +1,37 @@
 {
-  "name": "merchant-competition-dashboard",
-  "private": true,
-  "version": "0.1.0",
-  "scripts": {
-    "dev": "next dev",
-    "prebuild": "prisma generate",
-    "build": "next build",
-    "start": "next start",
-    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
-    "cf-typegen": "wrangler types --env-interface CloudflareEnv",
-    "lint": "eslint .",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@opennextjs/cloudflare": "^1.20.2",
-    "@prisma/adapter-d1": "^6.19.3",
-    "@prisma/client": "^6.6.0",
-    "next": "^15.3.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "xlsx": "^0.18.5",
-    "zod": "^3.24.0"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260729.1",
-    "@types/node": "^22.0.0",
-    "@types/react": "^19.0.0",
-    "@types/react-dom": "^19.0.0",
-    "prisma": "^6.6.0",
-    "typescript": "^5.8.0",
-    "vitest": "^3.1.0",
-    "wrangler": "^4.115.0"
-  }
+    "name":  "merchant-competition-dashboard",
+    "private":  true,
+    "version":  "0.1.0",
+    "scripts":  {
+                    "dev":  "next dev",
+                    "prebuild":  "prisma generate",
+                    "build":  "next build",
+                    "start":  "next start",
+                    "preview":  "opennextjs-cloudflare build \u0026\u0026 opennextjs-cloudflare preview",
+                    "deploy":  "opennextjs-cloudflare build \u0026\u0026 opennextjs-cloudflare deploy",
+                    "cf-typegen":  "wrangler types --env-interface CloudflareEnv",
+                    "lint":  "eslint .",
+                    "test":  "vitest run"
+                },
+    "dependencies":  {
+                         "@opennextjs/cloudflare":  "^1.20.2",
+                         "@prisma/adapter-d1":  "^6.19.3",
+                         "@prisma/client":  "^6.6.0",
+                         "next":  "^15.3.0",
+                         "react":  "^19.1.0",
+                         "react-dom":  "^19.1.0",
+                         "xlsx":  "^0.18.5",
+                         "zod":  "^3.24.0"
+                     },
+    "devDependencies":  {
+                            "@cloudflare/workers-types":  "^5.20260729.1",
+                            "@types/node":  "^22.0.0",
+                            "@types/react":  "^19.0.0",
+                            "@types/react-dom":  "^19.0.0",
+                            "prisma":  "^6.6.0",
+                            "typescript":  "^5.8.0",
+                            "vitest":  "^3.1.0",
+                            "wrangler":  "^4.115.0"
+                        },
+    "packageManager":  "pnpm@11.9.0"
 }
