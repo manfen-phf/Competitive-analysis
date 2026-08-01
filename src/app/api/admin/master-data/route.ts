@@ -2,11 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getPrisma } from "@/lib/db";
 import { parseMasterDataRows } from "@/lib/master-data";
+import { getRuntimeSecret } from "@/lib/runtime-secrets";
 
 export async function POST(request: NextRequest) {
   const prisma = await getPrisma();
   const form = await request.formData();
-  if (form.get("passcode") !== process.env.ADMIN_IMPORT_PASSCODE) return NextResponse.json({ error: "管理员口令错误" }, { status: 401 });
+  const passcode = await getRuntimeSecret("ADMIN_IMPORT_PASSCODE");
+  if (form.get("passcode") !== passcode) return NextResponse.json({ error: "管理员口令错误" }, { status: 401 });
   const file = form.get("file");
   const effectiveFromText = String(form.get("effectiveFrom") ?? "");
   const defaultEffectiveFrom = effectiveFromText ? new Date(`${effectiveFromText}T00:00:00+08:00`) : undefined;
