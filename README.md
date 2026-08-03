@@ -19,8 +19,4 @@
 
 ## 当前待接入项
 
-真实订单截图识别服务使用 Agnes 2.0 Flash。Agnes 通过应用当前的公网请求地址读取带令牌保护的截图；截图存入 PostgreSQL，不需要 R2。单张 PNG、JPG 或 WebP 截图不得超过 1.8MB。未配置 `AGNES_API_KEY` 时上传会明确失败，不会写入订单数据。
-
-## CloudBase PostgreSQL 部署
-
-CloudBase 环境变量需要设置：DATABASE_URL、AGNES_API_KEY、ADMIN_IMPORT_PASSCODE。容器启动时会执行 pnpm prisma migrate deploy，仅应用仓库内的 PostgreSQL 迁移，随后启动网站。请使用腾讯云 PostgreSQL 的内网连接地址，并为应用数据库创建独立账号。
+真实订单截图识别服务使用 Agnes 2.0 Flash。Agnes 通过应用当前的公网请求地址读取带令牌保护的截图；截图存入 D1，不需要 R2。单张 PNG、JPG 或 WebP 截图不得超过 1.8MB。未配置 `AGNES_API_KEY` 时上传会明确失败，不会写入订单数据。

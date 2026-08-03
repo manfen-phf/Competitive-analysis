@@ -21,4 +21,4 @@ ENV PORT=3000
 
 EXPOSE 3000
 
-CMD ["sh", "-c", "pnpm prisma migrate deploy && pnpm start"]
+CMD ["pnpm", "start"]

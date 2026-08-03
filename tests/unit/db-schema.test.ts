@@ -1,13 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 describe("database", () => {
-  it("targets PostgreSQL and stores upload images as binary data", () => {
-    const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");
+  let getPrisma: typeof import("../../src/lib/db").getPrisma;
 
-    expect(schema).toMatch(/provider\s*=\s*"postgresql"/);
-    expect(schema).toMatch(/url\s*=\s*env\("DATABASE_URL"\)/);
+  beforeAll(async () => {
+    process.env.DATABASE_URL = "file:./dev.db";
+    ({ getPrisma } = await import("../../src/lib/db"));
+  });
+
+  it("connects to the local SQLite database", async () => {
+    const prisma = await getPrisma();
+    await expect(prisma.$queryRaw`SELECT 1`).resolves.toBeTruthy();
+  });
+
+  it("stores each upload image as D1 binary data", () => {
+    const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");
     expect(schema).toMatch(/imageData\s+Bytes/);
     expect(schema).toMatch(/imageMimeType\s+String/);
   });
