@@ -1,14 +1,9 @@
-{
+﻿{
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "gx-food-delivery-competition",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-07-30",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-07-29",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "observability": { "enabled": true },
-  "d1_databases": [{
-    "binding": "DB",
-    "database_name": "gx-food-delivery-competition-db",
-    "database_id": "c3be7f44-be64-4e9b-82d5-90ad20988f73"
-  }]
+  "d1_databases": [{ "binding": "DB", "database_name": "gx-food-delivery-competition-db", "database_id": "c3be7f44-be64-4e9b-82d5-90ad20988f73" }]
 }
