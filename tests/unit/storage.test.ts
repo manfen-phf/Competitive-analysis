@@ -18,4 +18,8 @@ describe("D1 screenshot storage", () => {
     expect(() => assertSupportedScreenshot?.(Buffer.from([1]), "image/gif"))
       .toThrow("仅支持 PNG、JPG 和 WebP 截图");
   });
+  it("encodes screenshots as a Qwen-compatible data URL for local development", () => {
+    expect(storage.imageDataUrl(Buffer.from([0xff, 0xd8]), "image/jpeg"))
+      .toBe("data:image/jpeg;base64,/9g=");
+  });
 });

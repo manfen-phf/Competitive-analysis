@@ -3,7 +3,7 @@ import { getPrisma } from "@/lib/db";
 import { imageHash } from "@/lib/dedup";
 import { recognizeOrderScreenshot } from "@/lib/ocr";
 import { validateRecognition } from "@/lib/validation";
-import { assertSupportedScreenshot, publicUploadImageUrl } from "@/lib/storage";
+import { assertSupportedScreenshot, imageDataUrl } from "@/lib/storage";
 import { randomUUID } from "node:crypto";
 
 export async function POST(request: NextRequest) {
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
   if (await prisma.upload.findUnique({ where: { imageHash: hash } })) return NextResponse.json({ error: "重复截图，未计入数据" }, { status: 409 });
   const upload = await prisma.upload.create({ data: { imageHash: hash, imageData: bytes, imageMimeType: file.type, imageAccessToken: randomUUID() } });
   try {
-    const recognition = await recognizeOrderScreenshot(publicUploadImageUrl(request.nextUrl.origin, upload.id, upload.imageAccessToken));
+    const recognition = await recognizeOrderScreenshot(imageDataUrl(bytes, file.type));
     const validation = validateRecognition(recognition);
     if (!validation.ok) throw new Error(validation.reason);
     const { confidence: _confidence, ...orderFields } = recognition;

@@ -6,6 +6,7 @@ import { useState } from "react";
 export default function ImportPage() {
   const [passcode, setPasscode] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [effectiveFrom, setEffectiveFrom] = useState("");
   const [status, setStatus] = useState("");
   const [verified, setVerified] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -39,6 +40,7 @@ export default function ImportPage() {
       const form = new FormData();
       form.set("passcode", passcode);
       form.set("file", file);
+      if (effectiveFrom) form.set("effectiveFrom", effectiveFrom);
       const { body } = await post(form);
       setStatus(body.error || body.errors?.join("；") || `导入成功：${body.imported} 条商家归属记录`);
     } catch {
@@ -46,5 +48,5 @@ export default function ImportPage() {
     } finally { setSubmitting(false); }
   }
 
-  return <main><Link href="/">← 首页</Link><h1>主数据导入</h1><p className="muted">先验证管理员口令，再选择 Excel 数据源导入。</p><div className="filters"><label>管理员口令<input type="password" autoComplete="new-password" value={passcode} onChange={(event) => { setPasscode(event.target.value); setVerified(false); }} /></label><button className="secondary" onClick={verify} disabled={!passcode || submitting}>验证口令</button><label>Excel 数据源<input type="file" accept=".xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label><button className="primary" onClick={submit} disabled={!file || !verified || submitting}>{submitting ? "处理中…" : "校验并导入"}</button></div>{status && <p className="status">{status}</p>}</main>;
+  return <main><Link href="/">← 首页</Link><h1>主数据导入</h1><p className="muted">先验证管理员口令，再选择 Excel 数据源导入。</p><div className="filters"><label>管理员口令<input type="password" autoComplete="new-password" value={passcode} onChange={(event) => { setPasscode(event.target.value); setVerified(false); }} /></label><button className="secondary" onClick={verify} disabled={!passcode || submitting}>验证口令</button><label>生效开始日（留空即按导入当天）<input type="date" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} /></label><label>Excel 数据源<input type="file" accept=".xlsx,.xls" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label><button className="primary" onClick={submit} disabled={!file || !verified || submitting}>{submitting ? "处理中…" : "校验并导入"}</button></div>{status && <p className="status">{status}</p>}</main>;
 }
