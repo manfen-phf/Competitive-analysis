@@ -20,4 +20,9 @@ describe("workspace foundation", () => {
     expect(shell).toContain("WorkspaceRail");
     expect(shell).toContain("CommandPalette");
   });
+  it("presents the home as an operations command deck", () => {
+    const home = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
+    expect(home).toContain("OperationsBrief");
+    expect(home).toContain("toOperationsOverview");
+  });
 });

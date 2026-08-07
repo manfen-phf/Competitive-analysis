@@ -1,2 +1,18 @@
+"use client";
+
 import Link from "next/link";
-export default function Home(){return <main><header><h1>广西外卖竞争态势分析看板</h1><nav><Link href="/upload">上传截图</Link><Link href="/dashboard">数据看板</Link><Link href="/admin/import">主数据导入</Link><Link href="/records">上传记录</Link><Link href="/health">上传统计</Link></nav></header><section className="hero"><h2>商家维度的价格力分析</h2><p>运营人员上传订单截图，系统自动识别美团与 B家数据，管理层按城市、BD 和商家查看竞争差异。</p><Link className="primary" href="/upload">开始上传截图</Link></section><section className="grid"><article><h3>严格识别</h3><p>字段缺失、金额异常或重复订单将自动拦截，不进入看板。</p></article><article><h3>商家与 BD 归属</h3><p>城市联动商家搜索，按上传时间自动匹配当时负责 BD。</p></article><article><h3>价格构成对比</h3><p>用户实付、红包、配送费和商家结算金额按每单平均值比较。</p></article></section></main>}
+import { useEffect, useState } from "react";
+import { toOperationsOverview, type AnalyticsInput, type OperationsOverview } from "@/lib/operations-view-model";
+
+const emptyAnalytics: AnalyticsInput = { platforms: { MEITUAN: { validOrderCount: 0, userPaidAmount: 0, platformRedPacket: 0, paidDeliveryFee: 0, merchantSettlementAmount: 0 }, B_JIA: { validOrderCount: 0, userPaidAmount: 0, platformRedPacket: 0, paidDeliveryFee: 0, merchantSettlementAmount: 0 } }, userPaidDifference: 0, merchantRanking: [] };
+
+export default function Home() {
+  const [overview, setOverview] = useState<OperationsOverview | null>(null);
+  useEffect(() => { fetch("/api/analytics").then((response) => response.ok ? response.json() : emptyAnalytics).then((data: AnalyticsInput) => setOverview(toOperationsOverview(data, "OPERATOR"))).catch(() => setOverview(toOperationsOverview(emptyAnalytics, "OPERATOR"))); }, []);
+  if (!overview) return <main className="operations-home"><p className="muted">{"\u6b63\u5728\u6574\u7406\u4eca\u65e5\u8fd0\u8425\u4fe1\u53f7\u2026"}</p></main>;
+  return <main className="operations-home"><OperationsBrief overview={overview} /></main>;
+}
+
+function OperationsBrief({ overview }: { overview: OperationsOverview }) {
+  return <><header className="operations-heading"><div><p>{"\u4eca\u65e5\u8fd0\u8425"}</p><h1>{overview.brief.title}</h1><span>{overview.brief.detail}</span></div><div className="health-orbit"><strong>{overview.healthScore ?? "—"}</strong><small>{"\u8fd0\u8425\u5065\u5eb7\u5ea6"}</small></div></header><section className="action-strip">{overview.actions.map((action) => <Link href={action.href} key={action.id}><span>{action.label}</span><b>→</b></Link>)}</section><section className="signal-grid">{overview.signals.map((signal) => <article key={signal.id} data-tone={signal.tone}><p>{signal.label}</p><strong>{signal.value}</strong><span>{signal.detail}</span></article>)}</section><section className="operations-evidence"><div><h2>{"\u5f85\u5904\u7406\u5546\u5bb6"}</h2><p>{overview.cityStatus.detail}</p></div>{overview.anomalies.length ? <div className="anomaly-list">{overview.anomalies.map((item) => <Link href={`/dashboard?merchantId=${encodeURIComponent(item.merchantId)}`} key={item.merchantId}><span>{item.merchantName}</span><strong>{`\u00a5${item.difference.toFixed(2)}`}</strong></Link>)}</div> : <Link className="secondary" href="/upload">{"\u4e0a\u4f20\u9996\u5f20\u5bf9\u6bd4\u8ba2\u5355"}</Link>}</section></>;
+}
