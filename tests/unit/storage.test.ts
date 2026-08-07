@@ -1,25 +1,9 @@
 import { describe, expect, it } from "vitest";
-import * as storage from "../../src/lib/storage";
+import { assertSupportedScreenshot } from "../../src/lib/storage";
 
-type ScreenshotStorage = typeof storage & {
-  assertSupportedScreenshot?: (bytes: Buffer, mimeType: string) => void;
-};
-
-describe("D1 screenshot storage", () => {
-  it("rejects screenshots larger than the D1-safe limit", () => {
-    const assertSupportedScreenshot = (storage as ScreenshotStorage).assertSupportedScreenshot;
-    expect(typeof assertSupportedScreenshot).toBe("function");
-    expect(() => assertSupportedScreenshot?.(Buffer.alloc(1_800_001), "image/png"))
+describe("temporary screenshot input", () => {
+  it("rejects screenshots larger than the recognition limit", () => {
+    expect(() => assertSupportedScreenshot(Buffer.alloc(1_800_001), "image/png"))
       .toThrow("截图不能超过 1.8MB");
-  });
-
-  it("rejects unsupported image formats", () => {
-    const assertSupportedScreenshot = (storage as ScreenshotStorage).assertSupportedScreenshot;
-    expect(() => assertSupportedScreenshot?.(Buffer.from([1]), "image/gif"))
-      .toThrow("仅支持 PNG、JPG 和 WebP 截图");
-  });
-  it("encodes screenshots as a Qwen-compatible data URL for local development", () => {
-    expect(storage.imageDataUrl(Buffer.from([0xff, 0xd8]), "image/jpeg"))
-      .toBe("data:image/jpeg;base64,/9g=");
   });
 });

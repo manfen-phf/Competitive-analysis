@@ -1,28 +1,15 @@
-import { beforeAll, describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
 
-describe("database", () => {
-  let getPrisma: typeof import("../../src/lib/db").getPrisma;
-
-  beforeAll(async () => {
-    process.env.DATABASE_URL = "file:./dev.db";
-    ({ getPrisma } = await import("../../src/lib/db"));
-  });
-
-  it("connects to the local SQLite database", async () => {
-    const prisma = await getPrisma();
-    await expect(prisma.$queryRaw`SELECT 1`).resolves.toBeTruthy();
-  });
-
-  it("stores each upload image as D1 binary data", () => {
+describe("database schema", () => {
+  it("uses PostgreSQL and stores structured recognition data without screenshots", () => {
     const schema = readFileSync(join(process.cwd(), "prisma/schema.prisma"), "utf8");
-    expect(schema).toMatch(/imageData\s+Bytes/);
-    expect(schema).toMatch(/imageMimeType\s+String/);
+    expect(schema).toContain('provider = "postgresql"');
+    expect(schema).toMatch(/recognitionJson\s+Json\?/);
+    expect(schema).not.toMatch(/image(FileId|Data|AccessToken|MimeType)/);
   });
-  it("uses local SQLite rather than a D1 adapter during development", () => {
-    const db = readFileSync(join(process.cwd(), "src/lib/db.ts"), "utf8");
-    expect(db).toContain('process.env.NODE_ENV === "production"');
+  it("includes a PostgreSQL migration for a new CloudBase database", () => {
+    expect(existsSync(join(process.cwd(), "prisma/migrations"))).toBe(true);
   });
 });

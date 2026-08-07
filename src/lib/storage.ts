@@ -7,10 +7,6 @@ export function assertSupportedScreenshot(bytes: Buffer, mimeType: string) {
   if (bytes.byteLength > MAX_SCREENSHOT_BYTES) throw new Error("截图不能超过 1.8MB");
 }
 
-export function publicUploadImageUrl(origin: string, uploadId: string, token: string) {
-  return `${origin.replace(/\/$/, "")}/api/uploads/${uploadId}/image?token=${encodeURIComponent(token)}`;
-}
-
 export function imageDataUrl(bytes: Buffer, mimeType: string) {
   return `data:${mimeType};base64,${bytes.toString("base64")}`;
 }

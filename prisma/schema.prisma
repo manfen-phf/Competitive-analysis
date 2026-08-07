@@ -4,7 +4,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -33,14 +33,12 @@ model MerchantAssignment {
 }
 
 model Upload {
-  id            String              @id @default(cuid())
-  imageData     Bytes
-  imageMimeType String
-  imageHash     String              @unique
-  imageAccessToken String         @unique
-  uploadedAt DateTime            @default(now())
-  order      OrderRecord?
-  failure    RecognitionFailure?
+  id              String              @id @default(cuid())
+  imageHash       String              @unique
+  recognitionJson Json?
+  uploadedAt      DateTime            @default(now())
+  order           OrderRecord?
+  failure         RecognitionFailure?
 }
 
 model OrderRecord {
