@@ -8,15 +8,18 @@ declare global {
 
 export async function getPrisma(): Promise<PrismaClient> {
   const { PrismaClient } = await import("@prisma/client");
-  try {
-    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
-    const { env } = await getCloudflareContext({ async: true });
-    if (env.DB) {
-      const { PrismaD1 } = await import("@prisma/adapter-d1");
-      return new PrismaClient({ adapter: new PrismaD1(env.DB) });
+
+  if (process.env.NODE_ENV === "production") {
+    try {
+      const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+      const { env } = await getCloudflareContext({ async: true });
+      if (env.DB) {
+        const { PrismaD1 } = await import("@prisma/adapter-d1");
+        return new PrismaClient({ adapter: new PrismaD1(env.DB) });
+      }
+    } catch {
+      // CloudBase and local Node runtimes use the configured Prisma datasource.
     }
-  } catch {
-    // Local tooling uses the SQLite client below.
   }
 
   const localPrisma = globalThis.__prisma ?? new PrismaClient();

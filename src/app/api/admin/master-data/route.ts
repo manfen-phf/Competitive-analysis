@@ -15,7 +15,7 @@ export async function POST(request: NextRequest) {
 
   const file = form.get("file");
   const effectiveFromText = String(form.get("effectiveFrom") ?? "");
-  const defaultEffectiveFrom = effectiveFromText ? new Date(`${effectiveFromText}T00:00:00+08:00`) : undefined;
+  const defaultEffectiveFrom = effectiveFromText ? new Date(`${effectiveFromText}T00:00:00+08:00`) : new Date();
   if (defaultEffectiveFrom && Number.isNaN(defaultEffectiveFrom.valueOf())) return NextResponse.json({ error: "导入生效开始日无效" }, { status: 400 });
   if (!file || typeof file === "string") return NextResponse.json({ error: "请选择 Excel 文件" }, { status: 400 });
 
