@@ -1,3 +1,5 @@
+// LEGACY ONLY: the V1 Worker entry is .open-next/worker.js (see wrangler.jsonc).
+// This historical standalone worker remains in Git for reference and is not deployed by V1.
 import * as XLSX from "xlsx";
 import type { D1Database } from "@cloudflare/workers-types";
 import { chunkStatements } from "./lib/d1-batch";

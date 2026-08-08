@@ -1,22 +1,54 @@
-# 广西外卖竞争态势分析看板（初版）
+# competitive-analysis — V1 技术基线
 
-面向一线运营上传订单截图、管理层查看价格竞争态势的内部工具。
+本仓库正在以 P0-0 为起点收敛到一条唯一的 V1 运行路线：
 
-## 已完成
+- Next.js / React：网站
+- Cloudflare Workers：运行时与 API
+- Cloudflare D1：结构化业务数据
+- Cloudflare R2：订单原图
+- 千问：后续 P0-3 的订单图识别服务
+- xlsx：后续商家主数据导入与管理员导出
 
-- 商家主数据导入：支持标准列，也支持现有“外卖组织结构 / 商家ID / 商家名称 / 合作BD”数据源。
-- 上传选择链路：城市 → 商家搜索/选择；服务端按上传时间校验有效 BD 归属。
-- 严格入库规则：字段缺失、低置信度、配送费金额关系异常、重复截图或重复订单均不进入看板。
-- 看板筛选：日、周、月、年粒度；自定义起止日期；城市、BD、商家筛选。
-- 美团与 B家每单平均的用户实付、平台红包、实付配送费、商家结算及差异，以及同商家双平台的价格差异排名。
+## 当前阶段
 
-## 第一次运行
+P0-0 只完成技术基线。旧 API 已全部置于 P0 验收门禁之后，不能再通过历史
+PostgreSQL、CloudBase 或 Agnes 路径提供服务。它们保留在 Git 历史和 legacy
+文件中，仅供参考，不是 V1 的运行实现。
 
-1. 将 `.env.example` 复制为 `.env`，至少设置 `ADMIN_IMPORT_PASSCODE`；启用实际图片识别时设置 `QWEN_API_KEY`。
-2. 执行 `pnpm exec prisma db push`。
-3. 执行 `pnpm dev`，打开 `http://localhost:3000`。
-4. 到“主数据导入”页面导入 Excel。若当前日更数据没有“生效开始日”列，填写本次导入的生效开始日即可。
+后续阶段依次为：P0-1 商家主数据、P0-2 BD 采集、P0-3 千问识别、P0-4 竞对
+分析、P0-5 采集统计、P0-6 管理员数据中心。
 
-## 当前待接入项
+## 本地验证
 
-真实订单截图识别服务使用 Qwen-VL-Plus。本地开发会将图片以内嵌 Data URL 发送给 Qwen，不依赖公网可访问地址；截图和结构化结果保存到本地 SQLite。单张 PNG、JPG 或 WebP 截图不得超过 1.8MB。未配置 `QWEN_API_KEY` 时上传会明确失败，不会写入订单数据。
+```powershell
+pnpm install
+$env:DATABASE_URL = "file:./dev.db"
+pnpm exec prisma validate
+pnpm test
+pnpm build
+pnpm exec opennextjs-cloudflare build
+```
+
+## Cloudflare 配置
+
+`wrangler.jsonc` 已声明：
+
+- D1 binding：`DB` → `gx-food-delivery-competition-db`
+- R2 binding：`SCREENSHOT_BUCKET` → `gx-food-delivery-competition-images`
+- Worker entry：OpenNext 生成的 `.open-next/worker.js`
+
+线上资源操作前，先登录并确认账号：
+
+```powershell
+pnpm exec wrangler login
+pnpm exec wrangler whoami
+```
+
+若 R2 Bucket 尚未创建，可执行：
+
+```powershell
+pnpm exec wrangler r2 bucket create gx-food-delivery-competition-images
+```
+
+线上 D1 migration 与真实读写验证在账号登录后执行。请勿将 API Key、口令或
+数据库密码写入 Git、README 或前端代码。
