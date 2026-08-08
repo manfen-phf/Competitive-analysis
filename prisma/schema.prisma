@@ -8,70 +8,137 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model MasterDataVersion {
-  id          String               @id @default(cuid())
-  importedAt  DateTime             @default(now())
-  isActive    Boolean              @default(true)
-  assignments MerchantAssignment[]
+model UserAccount {
+  id                    String                  @id @default(cuid())
+  externalSubject       String                  @unique
+  displayName           String
+  role                  String
+  isActive              Boolean                 @default(true)
+  createdAt             DateTime                @default(now())
+  bdAssignments         MerchantBdAssignment[]
+  collectionSessions    CollectionSession[]     @relation("CollectionBd")
+  uploadedImages        UploadImage[]           @relation("ImageUploader")
+  confirmedOrders       ConfirmedOrder[]        @relation("OrderConfirmer")
 
-  @@index([isActive, importedAt])
+  @@index([role, isActive])
 }
 
-model MerchantAssignment {
-  id            String            @id @default(cuid())
+model City {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  createdAt DateTime   @default(now())
+  merchants Merchant[]
+}
+
+model Merchant {
+  id              String                  @id @default(cuid())
+  merchantCode    String
+  name            String
+  cityId          String
+  city            City                    @relation(fields: [cityId], references: [id])
+  createdAt       DateTime                @default(now())
+  bdAssignments   MerchantBdAssignment[]
+  collections     CollectionSession[]
+
+  @@unique([merchantCode, cityId])
+  @@index([cityId, merchantCode])
+}
+
+model MerchantBdAssignment {
+  id            String      @id @default(cuid())
   merchantId    String
-  merchantName  String
-  city          String
-  bdName        String
+  bdUserId      String
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  versionId     String
-  version       MasterDataVersion @relation(fields: [versionId], references: [id])
+  merchant      Merchant    @relation(fields: [merchantId], references: [id])
+  bdUser        UserAccount @relation(fields: [bdUserId], references: [id])
 
-  @@index([city, merchantId])
   @@index([merchantId, effectiveFrom])
+  @@index([bdUserId, effectiveFrom])
 }
 
-model Upload {
-  id            String              @id @default(cuid())
-  imageData     Bytes
-  imageMimeType String
-  imageHash     String              @unique
-  imageAccessToken String         @unique
-  uploadedAt DateTime            @default(now())
-  order      OrderRecord?
-  failure    RecognitionFailure?
-}
-
-model OrderRecord {
-  id          String @id @default(cuid())
-  uploadId    String @unique
-  upload      Upload @relation(fields: [uploadId], references: [id])
-  orderNumber String @unique
-  platform    String
+model CollectionSession {
+  id          String          @id @default(cuid())
   merchantId  String
-  merchantName String @default("")
-  city        String
-  bdName      String
-  uploadedAt  DateTime @default(now())
-  dishPrice Float
-  packagingFee Float
-  platformRedPacket Float
+  bdUserId    String
+  collectedAt DateTime        @default(now())
+  status      String          @default("DRAFT")
+  merchant    Merchant        @relation(fields: [merchantId], references: [id])
+  bdUser      UserAccount     @relation("CollectionBd", fields: [bdUserId], references: [id])
+  images      UploadImage[]
+  orders      ConfirmedOrder[]
+
+  @@index([merchantId, collectedAt])
+  @@index([bdUserId, collectedAt])
+}
+
+model UploadImage {
+  id                  String             @id @default(cuid())
+  collectionSessionId String
+  platform            String
+  r2Key               String             @unique
+  imageHash           String             @unique
+  imageMimeType       String
+  uploadedAt          DateTime           @default(now())
+  uploadedById        String
+  collectionSession   CollectionSession  @relation(fields: [collectionSessionId], references: [id])
+  uploadedBy          UserAccount        @relation("ImageUploader", fields: [uploadedById], references: [id])
+  recognition         RecognitionResult?
+  confirmedOrder      ConfirmedOrder?
+  failures            RecognitionFailureV1[]
+
+  @@unique([collectionSessionId, platform])
+  @@index([collectionSessionId, uploadedAt])
+}
+
+model RecognitionResult {
+  id             String      @id @default(cuid())
+  uploadImageId  String      @unique
+  provider       String
+  status         String
+  rawJson        String?
+  structuredJson String?
+  confidence     Float?
+  recognizedAt   DateTime?
+  uploadImage    UploadImage @relation(fields: [uploadImageId], references: [id])
+
+  @@index([provider, status])
+}
+
+model ConfirmedOrder {
+  id                  String            @id @default(cuid())
+  collectionSessionId String
+  uploadImageId       String            @unique
+  platform            String
+  orderNumber         String
+  dishPrice           Float
+  packagingFee        Float
+  platformRedPacket   Float
   originalDeliveryFee Float
   deliveryFeeReduction Float
-  paidDeliveryFee Float
+  paidDeliveryFee     Float
   merchantSettlementAmount Float
-  userPaidAmount Float
-  otherPromotion Float
+  userPaidAmount      Float
+  otherPromotion      Float
   technicalServiceFee Float
-  deliveryServiceFee Float
-  merchantRate Float
+  deliveryServiceFee  Float
+  merchantRate        Float
+  confirmedById       String?
+  confirmedAt         DateTime?
+  collectionSession   CollectionSession @relation(fields: [collectionSessionId], references: [id])
+  uploadImage         UploadImage       @relation(fields: [uploadImageId], references: [id])
+  confirmedBy         UserAccount?      @relation("OrderConfirmer", fields: [confirmedById], references: [id])
+
+  @@unique([collectionSessionId, platform])
+  @@index([orderNumber])
 }
 
-model RecognitionFailure {
-  id        String @id @default(cuid())
-  uploadId  String @unique
-  upload    Upload @relation(fields: [uploadId], references: [id])
-  reason    String
-  createdAt DateTime @default(now())
+model RecognitionFailureV1 {
+  id            String      @id @default(cuid())
+  uploadImageId String
+  reason        String
+  createdAt     DateTime    @default(now())
+  uploadImage   UploadImage @relation(fields: [uploadImageId], references: [id])
+
+  @@index([uploadImageId, createdAt])
 }
