@@ -3,8 +3,6 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { NextResponse } from "next/server";
 import { handleMasterDataGet, handleMasterDataPost, type MasterDataDependencies } from "@/lib/master-data-api";
 
-export const runtime = "edge";
-
 function jsonError(error: string, status: number) {
   return NextResponse.json({ error }, { status });
 }

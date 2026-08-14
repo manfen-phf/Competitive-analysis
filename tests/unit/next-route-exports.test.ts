@@ -8,5 +8,6 @@ describe("Next.js 路由导出", () => {
 
     expect(route).not.toContain("export async function handleMasterDataPost");
     expect(route).not.toContain("export async function handleMasterDataGet");
+    expect(route).not.toContain('runtime = "edge"');
   });
 });
