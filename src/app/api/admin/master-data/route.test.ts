@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { describe, expect, it } from "vitest";
-import { handleMasterDataGet, handleMasterDataPost } from "./route";
+import { handleMasterDataGet, handleMasterDataPost } from "@/lib/master-data-api";
 
 const headers = ["\u5916\u5356\u7ec4\u7ec7\u7ed3\u6784", "\u5546\u5bb6ID", "\u5546\u5bb6\u540d\u79f0", "\u5408\u4f5cBD"];
 

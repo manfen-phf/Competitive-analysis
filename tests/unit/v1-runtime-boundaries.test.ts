@@ -11,13 +11,17 @@ function routeFiles(directory: string): string[] {
 }
 
 describe("V1 runtime boundaries", () => {
-  it("keeps unfinished legacy API routes behind the P0 gate", () => {
+  it("keeps unfinished routes behind the P0 gate while allowing the accepted P0-1 import route", () => {
     const routes = routeFiles(join(process.cwd(), "src/app/api"));
 
     expect(routes.length).toBeGreaterThan(0);
     for (const route of routes) {
       const source = readFileSync(route, "utf8");
-      expect(source).toContain("p0Unavailable");
+      if (route.endsWith(join("admin", "master-data", "route.ts"))) {
+        expect(source).toContain("handleMasterDataPost");
+      } else {
+        expect(source).toContain("p0Unavailable");
+      }
       expect(source).not.toContain("imageData");
       expect(source).not.toContain("recognizeOrderScreenshot");
       expect(source).not.toContain("AGNES");
