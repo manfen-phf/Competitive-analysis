@@ -20,6 +20,21 @@ const merchantIdFor = (row: Pick<NormalizedMerchantRow, "cityName" | "merchantCo
 const cityIdFor = (cityName: string) => `city:${cityName}`;
 const bdIdFor = (bdName: string) => `bd:${bdName}`;
 
+function pushValueStatements(
+  db: D1Database,
+  statements: D1PreparedStatement[],
+  prefix: string,
+  suffix: string,
+  values: unknown[][],
+  rowsPerStatement: number,
+) {
+  for (let index = 0; index < values.length; index += rowsPerStatement) {
+    const chunk = values.slice(index, index + rowsPerStatement);
+    const placeholders = chunk.map((row) => `(${row.map(() => "?").join(", ")})`).join(", ");
+    statements.push(db.prepare(`${prefix} VALUES ${placeholders} ${suffix}`).bind(...chunk.flat()));
+  }
+}
+
 function previousUtcDay(day: string): string {
   const date = new Date(`${day}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() - 1);
@@ -55,15 +70,33 @@ export async function syncMasterData(db: D1Database, rows: NormalizedMerchantRow
   };
   const statements: D1PreparedStatement[] = [];
 
-  for (const cityName of cities) {
-    statements.push(db.prepare(`INSERT INTO "City" ("id", "name") VALUES (?, ?) ON CONFLICT("name") DO NOTHING`).bind(cityIdFor(cityName), cityName));
-  }
+  pushValueStatements(
+    db,
+    statements,
+    `INSERT INTO "City" ("id", "name")`,
+    `ON CONFLICT("name") DO NOTHING`,
+    [...cities].map((cityName) => [cityIdFor(cityName), cityName]),
+    50,
+  );
 
+  const bdValues: unknown[][] = [];
   for (const bdName of bds) {
     const externalSubject = bdIdFor(bdName);
     if (!bdSubjects.has(externalSubject)) summary.insertedBds += 1;
-    statements.push(db.prepare(`INSERT INTO "UserAccount" ("id", "externalSubject", "displayName", "role", "isActive") VALUES (?, ?, ?, 'BD', true) ON CONFLICT("externalSubject") DO UPDATE SET "displayName" = excluded."displayName", "isActive" = true`).bind(externalSubject, externalSubject, bdName));
+    bdValues.push([externalSubject, externalSubject, bdName]);
   }
+  pushValueStatements(
+    db,
+    statements,
+    `INSERT INTO "UserAccount" ("id", "externalSubject", "displayName", "role", "isActive")`,
+    `ON CONFLICT("externalSubject") DO UPDATE SET "displayName" = excluded."displayName", "isActive" = true`,
+    bdValues.map((row) => [...row, "BD", true]),
+    20,
+  );
+
+  const merchantValues: unknown[][] = [];
+  const assignmentValues: unknown[][] = [];
+  const assignmentUpdates: Array<{ merchantId: string; bdUserId: string }> = [];
 
   for (const row of rows) {
     const merchantId = merchantIdFor(row);
@@ -72,15 +105,44 @@ export async function syncMasterData(db: D1Database, rows: NormalizedMerchantRow
     if (!existingMerchant) summary.insertedMerchants += 1;
     else if (existingMerchant.merchantName !== row.merchantName) summary.updatedMerchants += 1;
 
-    statements.push(db.prepare(`INSERT INTO "Merchant" ("id", "merchantCode", "name", "cityId") VALUES (?, ?, ?, ?) ON CONFLICT("merchantCode", "cityId") DO UPDATE SET "name" = excluded."name"`).bind(merchantId, row.merchantCode, row.merchantName, cityIdFor(row.cityName)));
+    merchantValues.push([merchantId, row.merchantCode, row.merchantName, cityIdFor(row.cityName)]);
 
     const bdUserId = bdIdFor(row.bdName);
     if (activeBdByMerchantId.get(merchantId) === bdUserId) continue;
 
-    statements.push(db.prepare(`UPDATE "MerchantBdAssignment" SET "effectiveTo" = ? WHERE "merchantId" = ? AND "effectiveTo" IS NULL AND "bdUserId" <> ?`).bind(previousUtcDay(row.effectiveFrom), merchantId, bdUserId));
-    statements.push(db.prepare(`INSERT INTO "MerchantBdAssignment" ("id", "merchantId", "bdUserId", "effectiveFrom") VALUES (?, ?, ?, ?)`).bind(`assignment:${merchantId}:${bdUserId}:${row.effectiveFrom}`, merchantId, bdUserId, `${row.effectiveFrom}T00:00:00.000Z`));
+    if (activeBdByMerchantId.has(merchantId)) assignmentUpdates.push({ merchantId, bdUserId });
+    assignmentValues.push([`assignment:${merchantId}:${bdUserId}:${row.effectiveFrom}`, merchantId, bdUserId, `${row.effectiveFrom}T00:00:00.000Z`]);
     summary.updatedAssignments += 1;
   }
+
+  pushValueStatements(
+    db,
+    statements,
+    `INSERT INTO "Merchant" ("id", "merchantCode", "name", "cityId")`,
+    `ON CONFLICT("merchantCode", "cityId") DO UPDATE SET "name" = excluded."name"`,
+    merchantValues,
+    25,
+  );
+
+  for (let index = 0; index < assignmentUpdates.length; index += 30) {
+    const chunk = assignmentUpdates.slice(index, index + 30);
+    const merchantCase = chunk.map(() => `WHEN ? THEN ?`).join(" ");
+    const merchantIds = chunk.map(() => "?").join(", ");
+    statements.push(db.prepare(`UPDATE "MerchantBdAssignment" SET "effectiveTo" = ? WHERE "effectiveTo" IS NULL AND "merchantId" IN (${merchantIds}) AND "bdUserId" <> CASE "merchantId" ${merchantCase} ELSE "bdUserId" END`).bind(
+      previousUtcDay(rows[0].effectiveFrom),
+      ...chunk.map((item) => item.merchantId),
+      ...chunk.flatMap((item) => [item.merchantId, item.bdUserId]),
+    ));
+  }
+
+  pushValueStatements(
+    db,
+    statements,
+    `INSERT INTO "MerchantBdAssignment" ("id", "merchantId", "bdUserId", "effectiveFrom")`,
+    ``,
+    assignmentValues,
+    25,
+  );
 
   for (const batch of chunkStatements(statements)) await db.batch(batch);
   return summary;

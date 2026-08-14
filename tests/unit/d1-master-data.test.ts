@@ -6,6 +6,7 @@ type FakeStatement = { sql: string; bind: (...values: unknown[]) => FakeStatemen
 
 function fakeD1() {
   const sql: string[] = [];
+  let batchCalls = 0;
   const statement: FakeStatement = {
     sql: "",
     bind: () => statement,
@@ -14,11 +15,15 @@ function fakeD1() {
 
   return {
     sql,
+    get batchCalls() {
+      return batchCalls;
+    },
     prepare(query: string) {
       sql.push(query);
       return { ...statement, sql: query };
     },
     async batch(statements: FakeStatement[]) {
+      batchCalls += 1;
       statements.forEach((item) => sql.push(item.sql));
       return [];
     },
@@ -54,5 +59,21 @@ describe("D1 master data sync", () => {
     const result = await syncMasterData(existing as never, rows);
 
     expect(result).toMatchObject({ insertedMerchants: 0, updatedMerchants: 0, insertedBds: 0, updatedAssignments: 0 });
+  });
+
+  it("batches a large first import instead of issuing one D1 batch per row", async () => {
+    const db = fakeD1();
+    const largeRows = Array.from({ length: 1000 }, (_, index): NormalizedMerchantRow => ({
+      rowNumber: index + 2,
+      cityName: "玉林市",
+      merchantCode: `M-${index + 1}`,
+      merchantName: `商家 ${index + 1}`,
+      bdName: index % 2 === 0 ? "张三" : "李四",
+      effectiveFrom: "2026-08-14",
+    }));
+
+    await syncMasterData(db as never, largeRows);
+
+    expect(db.batchCalls).toBeLessThanOrEqual(2);
   });
 });
