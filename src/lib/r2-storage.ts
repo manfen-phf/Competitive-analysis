@@ -10,6 +10,7 @@ export type ScreenshotBucket = {
     customMetadata: { imageHash: string };
   }) => Promise<unknown>;
   get: (key: string) => Promise<{ arrayBuffer: () => Promise<ArrayBuffer> } | null>;
+  delete?: (key: string) => Promise<unknown>;
 };
 
 export type ScreenshotReference = {

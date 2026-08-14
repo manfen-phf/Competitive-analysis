@@ -19,6 +19,8 @@ describe("V1 runtime boundaries", () => {
       const source = readFileSync(route, "utf8");
       if (route.endsWith(join("admin", "master-data", "route.ts"))) {
         expect(source).toContain("handleMasterDataPost");
+      } else if (route.endsWith(join("uploads", "route.ts")) || route.includes(join("api", "bd"))) {
+        expect(source).not.toContain("p0Unavailable");
       } else {
         expect(source).toContain("p0Unavailable");
       }

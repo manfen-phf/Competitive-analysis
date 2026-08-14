@@ -1,10 +1,11 @@
 import type { PrismaClient } from "@prisma/client";
-import type { D1Database } from "@cloudflare/workers-types";
+import type { D1Database, R2Bucket } from "@cloudflare/workers-types";
 
 declare global {
   var __prisma: PrismaClient | undefined;
   interface CloudflareEnv {
     DB?: D1Database;
+    SCREENSHOT_BUCKET?: R2Bucket;
   }
 }
 
