@@ -13,4 +13,11 @@ describe("BD collection page", () => {
     expect(page).toContain("原价配送费");
     expect(page).toContain("/api/uploads");
   });
+
+  it("does not ask a BD to review an order number", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/collect/[id]/page.tsx"), "utf8");
+
+    expect(page).not.toContain('"orderNumber", "goodsTotal"');
+    expect(page).not.toContain('orderNumber: "订单号"');
+  });
 });

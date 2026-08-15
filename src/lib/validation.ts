@@ -45,7 +45,7 @@ export function calculateOrderMetrics(result: RecognitionRawResult, originalDeli
   const dishPrice = roundMoney(result.goodsTotal - (result.packagingFee ?? 0));
   const paidDeliveryFee = result.deliveryFeeReduction === null
     ? null
-    : roundMoney(originalDeliveryFee - result.deliveryFeeReduction);
+    : roundMoney(Math.max(0, originalDeliveryFee - result.deliveryFeeReduction));
   const userPaidAmount = result.merchantActivityAmount === null
     ? null
     : roundMoney(result.goodsTotal + originalDeliveryFee - result.merchantActivityAmount);

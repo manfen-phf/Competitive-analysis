@@ -30,6 +30,16 @@ describe("flexible order recognition", () => {
     expect(result.merchantRate).toBeCloseTo(17.41, 2);
   });
 
+  it("never allows the calculated paid delivery fee to fall below zero", () => {
+    const result = normalizeRecognitionResult({
+      platform: "MEITUAN",
+      goodsTotal: 25.5,
+      deliveryFeeReduction: 6,
+    }, 5.5);
+
+    expect(result.paidDeliveryFee).toBe(0);
+  });
+
   it("keeps B 家店铺满减 as an independent other activity breakdown", () => {
     const result = normalizeRecognitionResult({
       platform: "B_JIA",
