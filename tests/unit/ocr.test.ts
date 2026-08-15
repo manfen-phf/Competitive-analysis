@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { extractJsonContent, qwenRecognitionConfig } from "../../src/lib/ocr";
-import { createQwenRecognitionProvider } from "../../src/lib/recognition-provider";
 
 describe("extractJsonContent", () => {
   it("accepts a JSON response wrapped in a markdown fence", () => {
@@ -19,10 +18,4 @@ describe("extractJsonContent", () => {
     });
   });
 
-  it("exposes a Qwen recognition provider without enabling recognition before P0-3", async () => {
-    const provider = createQwenRecognitionProvider({ apiKey: "test-key", model: "qwen-vl-plus" });
-
-    expect(provider.name).toBe("QWEN");
-    await expect(provider.recognize({ imageDataUrl: "data:image/png;base64,AA==" })).rejects.toThrow("P0-3");
-  });
 });

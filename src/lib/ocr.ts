@@ -23,9 +23,13 @@ export function extractJsonContent(content: string): unknown {
 }
 
 // The upload-to-model workflow is intentionally deferred to P0-3.
-export async function recognizeOrderScreenshot(imageUrl: string, apiKey = ""): Promise<RecognitionResult> {
+export async function recognizeOrderScreenshot(
+  imageUrl: string,
+  apiKey = "",
+  expectedPlatform: "MEITUAN" | "B_JIA" = "MEITUAN",
+): Promise<RecognitionResult> {
   const provider = createQwenRecognitionProvider({ apiKey, model: qwenRecognitionConfig(apiKey).model });
-  return provider.recognize({ imageDataUrl: imageUrl });
+  return provider.recognize({ imageDataUrl: imageUrl, expectedPlatform });
 }
 
 export const recognitionContract = recognitionSchema;

@@ -62,6 +62,7 @@ export default function CollectPage() {
       const result = await readJson(await fetch("/api/uploads", { method: "POST", body: form }));
       setStatus({ tone: "success", text: `采集任务已创建（${result.collectionSessionId}）。下一阶段将自动进入 AI 识别。` });
       setMeituanFile(null); setBJiaFile(null);
+      window.location.assign(`/collect/${result.collectionSessionId}`);
     } catch (error) { setStatus({ tone: "error", text: error instanceof Error ? error.message : "上传失败" }); }
     finally { setBusy(false); }
   }
