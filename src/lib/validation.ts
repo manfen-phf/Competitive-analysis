@@ -13,6 +13,7 @@ export const recognitionRawSchema = z.object({
   orderNumber: nullableText,
   packagingFee: nullableMoney,
   merchantActivityAmount: nullableMoney,
+  otherActivityAmount: nullableMoney,
   deliveryFeeReduction: nullableMoney,
   platformRedPacketAmount: nullableMoney,
   platformRedPacketMerchantShare: nullableMoney,

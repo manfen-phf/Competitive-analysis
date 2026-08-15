@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { confirmCollection, recognizeCollection } from "@/lib/collection-recognition";
 
-const recognized = (platform: "MEITUAN" | "B_JIA") => ({ platform, goodsTotal: 32, orderNumber: null, packagingFee: null, merchantActivityAmount: null, deliveryFeeReduction: null, platformRedPacketAmount: null, platformRedPacketMerchantShare: null, merchantSettlementAmount: null, technicalServiceFee: null, deliveryServiceFee: null, confidence: 0.95 });
+const recognized = (platform: "MEITUAN" | "B_JIA") => ({ platform, goodsTotal: 32, orderNumber: null, packagingFee: null, merchantActivityAmount: null, otherActivityAmount: null, deliveryFeeReduction: null, platformRedPacketAmount: null, platformRedPacketMerchantShare: null, merchantSettlementAmount: null, technicalServiceFee: null, deliveryServiceFee: null, confidence: 0.95 });
 
 function recognitionDb() {
   const batches: Array<Array<{ sql: string; values: unknown[] }>> = [];
@@ -30,9 +30,11 @@ describe("collection recognition", () => {
 
   it("writes nullable screenshot values to the flexible confirmed order table", async () => {
     const { db, batches } = recognitionDb();
-    await confirmCollection({ db: db as never, collectionSessionId: "collection:1", bdUserId: "bd:1", results: [recognized("MEITUAN"), recognized("B_JIA")] });
+    await confirmCollection({ db: db as never, collectionSessionId: "collection:1", bdUserId: "bd:1", results: [recognized("MEITUAN"), { ...recognized("B_JIA"), merchantActivityAmount: 22, otherActivityAmount: 3 }] });
     const writes = batches[0].filter((statement) => statement.sql.includes('INSERT INTO "ConfirmedOrderV1"'));
     expect(writes).toHaveLength(2);
+    expect(writes[0].sql).toContain('"otherActivityAmount"');
+    expect(writes[1].values).toContain(3);
     expect(writes[0].values).toContain(null);
     expect(writes[0].values).toContain(5);
   });

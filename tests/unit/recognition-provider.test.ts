@@ -7,6 +7,7 @@ const flexibleRecognition = {
   orderNumber: null,
   packagingFee: 2,
   merchantActivityAmount: 5.5,
+  otherActivityAmount: null,
   deliveryFeeReduction: 5.5,
   platformRedPacketAmount: null,
   platformRedPacketMerchantShare: null,

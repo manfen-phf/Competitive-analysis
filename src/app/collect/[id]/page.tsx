@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 type Platform = "MEITUAN" | "B_JIA";
 type OrderResult = {
-  platform: Platform; goodsTotal: number; orderNumber: string | null; packagingFee: number | null; merchantActivityAmount: number | null;
+  platform: Platform; goodsTotal: number; orderNumber: string | null; packagingFee: number | null; merchantActivityAmount: number | null; otherActivityAmount: number | null;
   deliveryFeeReduction: number | null; platformRedPacketAmount: number | null; platformRedPacketMerchantShare: number | null;
   merchantSettlementAmount: number | null; technicalServiceFee: number | null; deliveryServiceFee: number | null; confidence: number | null;
   dishPrice: number; originalDeliveryFee: number; paidDeliveryFee: number | null; userPaidAmount: number | null; merchantRate: number | null;
@@ -13,12 +13,13 @@ type OrderResult = {
 type Image = { imageId: string; platform: Platform; recognitionStatus: string | null; structuredResult: OrderResult | null; failureReason: string | null };
 type Collection = { collectionSessionId: string; status: string; merchantName: string; merchantCode: string; cityName: string; originalDeliveryFee: number | null; images: Image[] };
 
-const editableFields: Array<keyof Pick<OrderResult, "orderNumber" | "goodsTotal" | "packagingFee" | "merchantActivityAmount" | "deliveryFeeReduction" | "platformRedPacketAmount" | "platformRedPacketMerchantShare" | "merchantSettlementAmount" | "technicalServiceFee" | "deliveryServiceFee">> = [
-  "orderNumber", "goodsTotal", "packagingFee", "merchantActivityAmount", "deliveryFeeReduction", "platformRedPacketAmount", "platformRedPacketMerchantShare", "merchantSettlementAmount", "technicalServiceFee", "deliveryServiceFee",
+const editableFields: Array<keyof Pick<OrderResult, "orderNumber" | "goodsTotal" | "packagingFee" | "merchantActivityAmount" | "otherActivityAmount" | "deliveryFeeReduction" | "platformRedPacketAmount" | "platformRedPacketMerchantShare" | "merchantSettlementAmount" | "technicalServiceFee" | "deliveryServiceFee">> = [
+  "orderNumber", "goodsTotal", "packagingFee", "merchantActivityAmount", "otherActivityAmount", "deliveryFeeReduction", "platformRedPacketAmount", "platformRedPacketMerchantShare", "merchantSettlementAmount", "technicalServiceFee", "deliveryServiceFee",
 ];
-const editableLabels: Record<(typeof editableFields)[number], string> = {
+const editableLabels: Record<string, string> = {
   orderNumber: "订单号", goodsTotal: "商品总价（必填）", packagingFee: "打包费 / 餐盒费", merchantActivityAmount: "商家活动款", deliveryFeeReduction: "减配送费", platformRedPacketAmount: "平台红包抵扣金额", platformRedPacketMerchantShare: "平台红包商家承担", merchantSettlementAmount: "结算金额", technicalServiceFee: "技术服务费", deliveryServiceFee: "配送服务费",
 };
+editableLabels.otherActivityAmount = "其他活动（如店铺满减）";
 const calculatedFields: Array<keyof Pick<OrderResult, "dishPrice" | "originalDeliveryFee" | "paidDeliveryFee" | "userPaidAmount" | "merchantRate">> = ["dishPrice", "originalDeliveryFee", "paidDeliveryFee", "userPaidAmount", "merchantRate"];
 const calculatedLabels: Record<(typeof calculatedFields)[number], string> = { dishPrice: "菜品原价（系统计算）", originalDeliveryFee: "原价配送费（BD填写）", paidDeliveryFee: "实付配送费（系统计算）", userPaidAmount: "用户实付（系统计算）", merchantRate: "实际费率（系统计算）" };
 

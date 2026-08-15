@@ -30,6 +30,21 @@ describe("flexible order recognition", () => {
     expect(result.merchantRate).toBeCloseTo(17.41, 2);
   });
 
+  it("keeps B 家店铺满减 as an independent other activity breakdown", () => {
+    const result = normalizeRecognitionResult({
+      platform: "B_JIA",
+      goodsTotal: 67.8,
+      merchantActivityAmount: 22,
+      otherActivityAmount: 3,
+      platformRedPacketMerchantShare: 15,
+      deliveryFeeReduction: 4,
+    }, 5);
+
+    expect(result.merchantActivityAmount).toBe(22);
+    expect(result.otherActivityAmount).toBe(3);
+    expect(result.userPaidAmount).toBe(50.8);
+  });
+
   it("rejects recognition data without a goods total", () => {
     expect(() => normalizeRecognitionResult({ platform: "MEITUAN" }, 0)).toThrow();
   });

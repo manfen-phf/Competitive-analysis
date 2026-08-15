@@ -14,9 +14,9 @@ function parseJsonContent(content: string): unknown {
 function recognitionPrompt(platform: RecognitionInput["expectedPlatform"]) {
   const platformName = platform === "MEITUAN" ? "美团" : "B家";
   return `你是外卖订单结算截图识别助手。识别一张${platformName}订单详情长图，只返回一个 JSON 对象，不要 markdown 或解释。
-JSON 必须包含以下字段：platform, goodsTotal, orderNumber, packagingFee, merchantActivityAmount, deliveryFeeReduction, platformRedPacketAmount, platformRedPacketMerchantShare, merchantSettlementAmount, technicalServiceFee, deliveryServiceFee, confidence。
+JSON 必须包含以下字段：platform, goodsTotal, orderNumber, packagingFee, merchantActivityAmount, otherActivityAmount, deliveryFeeReduction, platformRedPacketAmount, platformRedPacketMerchantShare, merchantSettlementAmount, technicalServiceFee, deliveryServiceFee, confidence。
 platform 必须为 ${platform}。goodsTotal 是“商品总价”，它必须是数值；若图片无法看清商品总价，返回 null。其他字段在图片没有明确展示时必须返回 null，绝不能猜测，金额单位为元。
-字段规则：packagingFee=打包费或餐盒费；merchantActivityAmount：美团取“商家对顾客的活动补贴”中商家承担金额，B家取“商家承担活动款”；deliveryFeeReduction=减配送费中商家承担金额；platformRedPacketAmount=支付红包或平台红包抵扣总金额；platformRedPacketMerchantShare=红包明细中的商家承担；merchantSettlementAmount=结算金额；technicalServiceFee：美团取“技术与运营服务费”总额，B家取“技术服务费”；deliveryServiceFee=配送服务费。orderNumber 取订单号；confidence 为 0 到 1 的数值。`;
+字段规则：packagingFee=打包费或餐盒费；merchantActivityAmount：美团取“商家对顾客的活动补贴”中商家承担总额，B家取页面顶部“商家承担活动款”总额；otherActivityAmount=非平台红包、非配送费活动的商家承担金额，B家“店铺满减”等归入此字段，例如“店铺满减｜满58元减3元，商家承担3元”返回3；deliveryFeeReduction=减配送费中商家承担金额；platformRedPacketAmount=支付红包或平台红包抵扣总金额；platformRedPacketMerchantShare=红包明细中的商家承担；merchantSettlementAmount=结算金额；technicalServiceFee：美团取“技术与运营服务费”总额，B家取“技术服务费”；deliveryServiceFee=配送服务费。orderNumber 取订单号；confidence 为 0 到 1 的数值。`;
 }
 
 export function createQwenRecognitionProvider(config: QwenRecognitionProviderConfig): RecognitionProvider {
