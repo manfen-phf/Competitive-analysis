@@ -22,7 +22,11 @@ describe("V1 runtime boundaries", () => {
       } else if (
         route.endsWith(join("uploads", "route.ts")) ||
         route.includes(join("api", "bd")) ||
-        route.includes(join("api", "collections"))
+        route.includes(join("api", "collections")) ||
+        route.endsWith(join("analytics", "route.ts")) ||
+        route.endsWith(join("filter-options", "route.ts")) ||
+        route.endsWith(join("merchants", "route.ts")) ||
+        route.endsWith(join("records", "route.ts"))
       ) {
         expect(source).not.toContain("p0Unavailable");
       } else {

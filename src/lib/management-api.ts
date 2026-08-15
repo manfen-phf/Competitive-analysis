@@ -1,6 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import { NextResponse } from "next/server";
-import { getManagementOverview, parseManagementFilters } from "@/lib/management-analytics";
+import { getManagementOverview, parseManagementFilters, queryManagementRecords } from "@/lib/management-analytics";
 
 export async function handleManagementAnalyticsGet(request: Request, db: D1Database) {
   const overview = await getManagementOverview(db, parseManagementFilters(new URL(request.url)));
@@ -39,4 +39,9 @@ export async function handleManagementMerchantsGet(request: Request, db: D1Datab
     ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""}
     ORDER BY m."name" LIMIT 100`).bind(...values).all<{ merchantId: string; merchantName: string; cityName: string; bdName: string }>();
   return NextResponse.json({ merchants: result.results }, { headers: { "Cache-Control": "no-store" } });
+}
+
+export async function handleManagementRecordsGet(request: Request, db: D1Database) {
+  const records = await queryManagementRecords(db, parseManagementFilters(new URL(request.url)));
+  return NextResponse.json({ records }, { headers: { "Cache-Control": "no-store" } });
 }

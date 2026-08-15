@@ -22,7 +22,8 @@ describe("workspace foundation", () => {
   });
   it("presents the home as an operations command deck", () => {
     const home = readFileSync(join(process.cwd(), "src/app/page.tsx"), "utf8");
-    expect(home).toContain("OperationsBrief");
-    expect(home).toContain("toOperationsOverview");
+    expect(home).toContain("/api/analytics");
+    expect(home).toContain("采集健康度");
+    expect(home).toContain("异常预警");
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handleManagementAnalyticsGet, handleManagementFilterOptionsGet, handleManagementMerchantsGet } from "../../src/lib/management-api";
+import { handleManagementAnalyticsGet, handleManagementFilterOptionsGet, handleManagementMerchantsGet, handleManagementRecordsGet } from "../../src/lib/management-api";
 
 describe("management analytics API", () => {
   it("returns overview data filtered by the requested city", async () => {
@@ -48,5 +48,22 @@ describe("management analytics API", () => {
     };
     const response = await handleManagementMerchantsGet(new Request("https://example.com/api/merchants?city=%E7%8E%89%E6%9E%97%E5%B8%82&query=%E7%94%B2"), db as never);
     await expect(response.json()).resolves.toEqual({ merchants: [{ merchantId: "merchant:1", merchantName: "甲店", cityName: "玉林市", bdName: "张三" }] });
+  });
+
+  it("returns traceable upload records without an order number field", async () => {
+    const db = {
+      prepare() {
+        return { bind() { return this; }, async all() { return { results: [{
+          uploadImageId: "image:1", collectionSessionId: "session:1", platform: "B_JIA", uploadedAt: "2026-08-15T08:00:00.000Z",
+          r2Key: "screenshots/ab/example.jpg", imageMimeType: "image/jpeg", recognitionStatus: "SUCCESS", failureReason: null,
+          merchantId: "merchant:1", merchantName: "甲店", cityName: "玉林市", bdName: "张三", confirmedOrderId: "order:1",
+          goodsTotal: 42.04, userPaidAmount: 25.5, merchantSettlementAmount: 23.88, merchantRate: 0.12, otherActivityAmount: 0,
+        }] }; } };
+      },
+    };
+
+    const response = await handleManagementRecordsGet(new Request("https://example.com/api/records?city=%E7%8E%89%E6%9E%97%E5%B8%82"), db as never);
+
+    await expect(response.json()).resolves.toEqual({ records: [expect.objectContaining({ uploadImageId: "image:1", cityName: "玉林市" })] });
   });
 });

@@ -57,6 +57,27 @@ export type ConfirmedOrderRow = {
   merchantRate: number | null;
 };
 
+export type ManagementRecord = {
+  uploadImageId: string;
+  collectionSessionId: string;
+  platform: ManagementPlatform;
+  uploadedAt: string;
+  r2Key: string;
+  imageMimeType: string;
+  recognitionStatus: string | null;
+  failureReason: string | null;
+  merchantId: string;
+  merchantName: string;
+  cityName: string;
+  bdName: string;
+  confirmedOrderId: string | null;
+  goodsTotal: number | null;
+  userPaidAmount: number | null;
+  merchantSettlementAmount: number | null;
+  merchantRate: number | null;
+  otherActivityAmount: number | null;
+};
+
 const platforms: ManagementPlatform[] = ["MEITUAN", "B_JIA"];
 const moneyKeys = [
   "goodsTotal", "dishPrice", "packagingFee", "merchantActivityAmount", "otherActivityAmount",
@@ -120,14 +141,41 @@ export function summarizeConfirmedOrders(rows: ConfirmedOrderRow[]) {
     }];
   }).sort((left, right) => right.userPaidDifference - left.userPaidDifference);
 
-  return { confirmedOrderCount: rows.length, platforms: platformSummaries, merchantRanking };
+  const dimensionSummary = (field: "cityName" | "bdName") => {
+    const groups = new Map<string, ConfirmedOrderRow[]>();
+    for (const row of rows) groups.set(row[field], [...(groups.get(row[field]) ?? []), row]);
+    return [...groups.entries()].map(([label, items]) => {
+      const meituan = platformSummary(items, "MEITUAN");
+      const bJia = platformSummary(items, "B_JIA");
+      return {
+        label,
+        confirmedOrderCount: items.length,
+        meituanOrderCount: meituan.orderCount,
+        bJiaOrderCount: bJia.orderCount,
+        userPaidDifference: decimal(meituan.averageUserPaidAmount - bJia.averageUserPaidAmount),
+      };
+    }).sort((left, right) => right.confirmedOrderCount - left.confirmedOrderCount || left.label.localeCompare(right.label));
+  };
+
+  return { confirmedOrderCount: rows.length, platforms: platformSummaries, merchantRanking, citySummary: dimensionSummary("cityName"), bdSummary: dimensionSummary("bdName") };
 }
 
 type RawConfirmedOrderRow = Omit<ConfirmedOrderRow, "platform"> & { platform: string };
 type RawUploadStateRow = Omit<UploadStateRow, "platform"> & { platform: string };
+type RawManagementRecord = Omit<ManagementRecord, "platform" | "uploadedAt" | "failureReason"> & { platform: string; uploadedAt: string; recognitionRawJson: string | null };
 
 function isPlatform(value: string): value is ManagementPlatform {
   return value === "MEITUAN" || value === "B_JIA";
+}
+
+function recognitionFailureReason(status: string | null, rawJson: string | null) {
+  if (status !== "FAILED") return null;
+  try {
+    const raw = JSON.parse(rawJson ?? "{}") as { reason?: unknown };
+    return typeof raw.reason === "string" && raw.reason.trim() ? raw.reason.trim() : "识别失败";
+  } catch {
+    return "识别失败";
+  }
 }
 
 function numberOrNull(value: unknown) {
@@ -199,6 +247,39 @@ export async function queryUploadStates(db: D1Database, filters: ManagementFilte
     ${filtersSql.sql}
     ORDER BY i."uploadedAt" DESC`).bind(...filtersSql.values).all<RawUploadStateRow>();
   return result.results.map(toUploadState);
+}
+
+export async function queryManagementRecords(db: D1Database, filters: ManagementFilters = {}, limit = 100) {
+  const filtersSql = where(filters, 'i."platform"');
+  const result = await db.prepare(`SELECT
+      i."id" AS "uploadImageId", s."id" AS "collectionSessionId", i."platform" AS "platform", i."uploadedAt" AS "uploadedAt", i."r2Key" AS "r2Key", i."imageMimeType" AS "imageMimeType",
+      r."status" AS "recognitionStatus", r."rawJson" AS "recognitionRawJson", m."id" AS "merchantId", m."name" AS "merchantName", c."name" AS "cityName", u."displayName" AS "bdName",
+      o."id" AS "confirmedOrderId", o."goodsTotal" AS "goodsTotal", o."userPaidAmount" AS "userPaidAmount", o."merchantSettlementAmount" AS "merchantSettlementAmount", o."merchantRate" AS "merchantRate", o."otherActivityAmount" AS "otherActivityAmount"
+    FROM "CollectionSession" s
+    JOIN "UploadImage" i ON i."collectionSessionId" = s."id"
+    JOIN "Merchant" m ON m."id" = s."merchantId"
+    JOIN "City" c ON c."id" = m."cityId"
+    JOIN "UserAccount" u ON u."id" = s."bdUserId"
+    LEFT JOIN "RecognitionResult" r ON r."uploadImageId" = i."id"
+    LEFT JOIN "ConfirmedOrderV1" o ON o."uploadImageId" = i."id"
+    ${filtersSql.sql}
+    ORDER BY i."uploadedAt" DESC LIMIT ?`).bind(...filtersSql.values, Math.max(1, Math.min(limit, 200))).all<RawManagementRecord>();
+  return result.results.map((row) => {
+    if (!isPlatform(row.platform)) throw new Error("Unknown collection platform");
+    return {
+      ...row,
+      platform: row.platform,
+      uploadedAt: String(row.uploadedAt),
+      recognitionStatus: row.recognitionStatus ?? null,
+      failureReason: recognitionFailureReason(row.recognitionStatus, row.recognitionRawJson),
+      confirmedOrderId: row.confirmedOrderId ?? null,
+      goodsTotal: numberOrNull(row.goodsTotal),
+      userPaidAmount: numberOrNull(row.userPaidAmount),
+      merchantSettlementAmount: numberOrNull(row.merchantSettlementAmount),
+      merchantRate: numberOrNull(row.merchantRate),
+      otherActivityAmount: numberOrNull(row.otherActivityAmount),
+    };
+  });
 }
 
 export async function getManagementOverview(db: D1Database, filters: ManagementFilters = {}) {

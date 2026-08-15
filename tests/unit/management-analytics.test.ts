@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getManagementOverview, parseManagementFilters, summarizeCollectionStates, summarizeConfirmedOrders } from "../../src/lib/management-analytics";
+import { getManagementOverview, parseManagementFilters, queryManagementRecords, summarizeCollectionStates, summarizeConfirmedOrders } from "../../src/lib/management-analytics";
 
 describe("management analytics", () => {
   it("counts a collection as paired only after both platform results are confirmed", () => {
@@ -36,6 +36,7 @@ describe("management analytics", () => {
     expect(summary.platforms.MEITUAN.averageGoodsTotal).toBe(25.5);
     expect(summary.platforms.B_JIA.averageOtherActivityAmount).toBe(3);
     expect(summary.merchantRanking).toEqual([expect.objectContaining({ merchantId: "merchant:1", userPaidDifference: -4.6 })]);
+    expect(summary.citySummary).toEqual([expect.objectContaining({ label: "玉林市", confirmedOrderCount: 2 })]);
   });
 
   it("reads the live flexible confirmed-order table rather than the legacy Prisma model", async () => {
@@ -63,5 +64,44 @@ describe("management analytics", () => {
     const filters = parseManagementFilters(new URL("https://example.com/api/analytics?city=%E7%8E%89%E6%9E%97%E5%B8%82&bd=%E5%BC%A0%E4%B8%89&platform=B_JIA&start=2026-08-01&end=2026-09-01&merchantId=merchant%3A1"));
     expect(filters).toEqual({ city: "玉林市", bd: "张三", platform: "B_JIA", start: "2026-08-01", end: "2026-09-01", merchantId: "merchant:1" });
     expect(parseManagementFilters(new URL("https://example.com/api/analytics?platform=unknown"))).toEqual({});
+  });
+
+  it("returns management records without exposing an order number", async () => {
+    const db = {
+      prepare(statement: string) {
+        return {
+          bind() { return this; },
+          async all() {
+            return { results: [{
+              uploadImageId: "image:1", collectionSessionId: "session:1", platform: "MEITUAN", uploadedAt: "2026-08-15T08:00:00.000Z",
+              r2Key: "screenshots/ab/example.jpg", imageMimeType: "image/jpeg", recognitionStatus: "SUCCESS", failureReason: null,
+              merchantId: "merchant:1", merchantName: "甲店", cityName: "玉林市", bdName: "张三", confirmedOrderId: "order:1",
+              goodsTotal: 25.5, userPaidAmount: 25.5, merchantSettlementAmount: 13.62, merchantRate: 0.12, otherActivityAmount: 0,
+            }] };
+          },
+        };
+      },
+    };
+
+    const records = await queryManagementRecords(db as never, { city: "玉林市" });
+
+    expect(records).toEqual([expect.objectContaining({ uploadImageId: "image:1", merchantName: "甲店", userPaidAmount: 25.5 })]);
+    expect(JSON.stringify(records)).not.toContain("orderNumber");
+  });
+
+  it("reads an AI failure reason from the saved recognition payload instead of a non-existent D1 column", async () => {
+    const db = {
+      prepare() {
+        return { bind() { return this; }, async all() { return { results: [{
+          uploadImageId: "image:failed", collectionSessionId: "session:failed", platform: "B_JIA", uploadedAt: "2026-08-15T08:00:00.000Z",
+          r2Key: "screenshots/ab/failed.jpg", imageMimeType: "image/jpeg", recognitionStatus: "FAILED", recognitionRawJson: JSON.stringify({ reason: "图片内容不完整" }),
+          merchantId: "merchant:1", merchantName: "甲店", cityName: "玉林市", bdName: "张三", confirmedOrderId: null,
+          goodsTotal: null, userPaidAmount: null, merchantSettlementAmount: null, merchantRate: null, otherActivityAmount: null,
+        }] }; } };
+      },
+    };
+
+    const [record] = await queryManagementRecords(db as never);
+    expect(record.failureReason).toBe("图片内容不完整");
   });
 });

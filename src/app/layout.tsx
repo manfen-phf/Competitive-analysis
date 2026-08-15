@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import { WorkspaceShell } from "@/components/workspace/workspace-shell";
+import { WorkspaceAssistant } from "@/components/workspace/assistant-panel";
 
 export const metadata: Metadata = {
   title: "玉林商数据汇总",
@@ -15,7 +16,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <body>
-        <WorkspaceShell contextLabel="玉林 · 外卖竞争态势运营">{children}</WorkspaceShell>
+        <WorkspaceShell contextLabel="玉林 · 外卖竞争态势运营" rightPanel={<WorkspaceAssistant />}>{children}</WorkspaceShell>
       </body>
     </html>
   );
