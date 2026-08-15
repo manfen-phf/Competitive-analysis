@@ -4,7 +4,7 @@
 
 **Goal:** 让管理员通过真实 D1 数据在首页、洞察、统计和识别记录中心完成外卖竞对采集运营管理。
 
-**Architecture:** 在服务端新增只读的运营聚合查询层，统一把 `CollectionSession`、`UploadImage`、`RecognitionResult`、`ConfirmedOrder`、`Merchant`、`City` 和 BD 用户映射为管理端 DTO。API 路由只负责解析筛选参数和返回 JSON；页面只读取 DTO，不直接组合底层业务表。工作台壳、首页、洞察、统计和记录页共用轻量组件与 CSS tokens，保持现有 BD 采集和确认路由不变。
+**Architecture:** 在服务端新增只读的运营聚合查询层，统一把 `CollectionSession`、`UploadImage`、`RecognitionResult`、已上线的 `ConfirmedOrderV1`、`Merchant`、`City` 和 BD 用户映射为管理端 DTO。查询直接使用 Cloudflare D1；API 路由只负责解析筛选参数和返回 JSON；页面只读取 DTO，不直接组合底层业务表。工作台壳、首页、洞察、统计和记录页共用轻量组件与 CSS tokens，保持现有 BD 采集和确认路由不变。
 
 **Tech Stack:** Next.js 15 App Router、React 19、TypeScript、Prisma D1 adapter、Cloudflare D1/R2、Vitest、OpenNext/Cloudflare Workers。
 
@@ -28,7 +28,7 @@
 - Test: `tests/unit/management-analytics.test.ts`
 
 **Interfaces:**
-- Consumes: `PrismaClient` from `src/lib/db.ts` and confirmed order relations.
+- Consumes: `D1Database` from the Cloudflare request context and the confirmed-order V1 relations.
 - Produces: `getManagementOverview(filters)`, `getManagementInsights(filters)`, `getCollectionStatistics(filters)`, `getManagementRecords(filters)`.
 - Produces types: `ManagementFilters`, `ManagementOverview`, `ManagementInsights`, `CollectionStatistics`, `ManagementRecord`.
 
@@ -71,13 +71,13 @@ export type ManagementFilters = {
   status?: "UPLOADED" | "RECOGNIZED" | "CONFIRMED" | "FAILED";
 };
 
-export async function getManagementOverview(filters: ManagementFilters, db = getPrisma()) {
-  // Fetch confirmed orders with merchant/city/BD relations and images with recognition status.
+export async function getManagementOverview(filters: ManagementFilters, db: D1Database) {
+  // Query ConfirmedOrderV1 with merchant/city/BD relations and image recognition status.
   // Derive all headline counts and top comparable merchant gaps from these rows.
 }
 ```
 
-Use one relation-aware Prisma query per independent dataset with `Promise.all`; map DB rows to plain DTOs before returning. Include `otherPromotion` in metric DTOs and never emit `orderNumber`.
+Use parameterized D1 statements per independent dataset with `Promise.all`; map raw rows to plain DTOs before returning. Include `otherActivityAmount` in metric DTOs and never emit `orderNumber`.
 
 - [ ] **Step 4: Extend pure analytics helpers where needed**
 
@@ -393,4 +393,3 @@ git push origin v1-core
 ```
 
 Only create this documentation commit if `README.md` changed. Push all prior commits regardless.
-
