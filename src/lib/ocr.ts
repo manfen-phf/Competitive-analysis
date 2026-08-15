@@ -1,4 +1,4 @@
-import { recognitionSchema, type RecognitionResult } from "@/lib/validation";
+import { recognitionRawSchema, type RecognitionRawResult } from "@/lib/validation";
 import { createQwenRecognitionProvider } from "@/lib/recognition-provider";
 
 export type QwenRecognitionConfig = {
@@ -27,9 +27,9 @@ export async function recognizeOrderScreenshot(
   imageUrl: string,
   apiKey = "",
   expectedPlatform: "MEITUAN" | "B_JIA" = "MEITUAN",
-): Promise<RecognitionResult> {
+): Promise<RecognitionRawResult> {
   const provider = createQwenRecognitionProvider({ apiKey, model: qwenRecognitionConfig(apiKey).model });
   return provider.recognize({ imageDataUrl: imageUrl, expectedPlatform });
 }
 
-export const recognitionContract = recognitionSchema;
+export const recognitionContract = recognitionRawSchema;

@@ -24,6 +24,7 @@ export type CreateCollectionInput = {
   bucket: ScreenshotBucket;
   bdUserId: string;
   merchantId: string;
+  originalDeliveryFee: number;
   images: CollectionImage[];
 };
 
@@ -34,6 +35,7 @@ export type CollectionCreateResult = {
 
 export async function createCollection(input: CreateCollectionInput): Promise<CollectionCreateResult> {
   await validateCollectionUpload(input.images);
+  if (!Number.isFinite(input.originalDeliveryFee) || input.originalDeliveryFee < 0) throw new Error("请填写有效的原价配送费");
 
   const assignment = await input.db.prepare(`SELECT 1 AS assigned
     FROM "MerchantBdAssignment"
@@ -53,8 +55,8 @@ export async function createCollection(input: CreateCollectionInput): Promise<Co
   try {
     for (const image of input.images) saved.push(await saveScreenshot(input.bucket, image.bytes, image.imageHash, image.imageMimeType));
     const statements = [
-      input.db.prepare(`INSERT INTO "CollectionSession" ("id", "merchantId", "bdUserId", "status") VALUES (?, ?, ?, 'UPLOADED')`)
-        .bind(sessionId, input.merchantId, input.bdUserId),
+      input.db.prepare(`INSERT INTO "CollectionSession" ("id", "merchantId", "bdUserId", "originalDeliveryFee", "status") VALUES (?, ?, ?, ?, 'UPLOADED')`)
+        .bind(sessionId, input.merchantId, input.bdUserId, input.originalDeliveryFee),
       ...input.images.map((image, index) => input.db.prepare(`INSERT INTO "UploadImage" ("id", "collectionSessionId", "platform", "r2Key", "imageHash", "imageMimeType", "uploadedById") VALUES (?, ?, ?, ?, ?, ?, ?)`)
         .bind(imageIds[index], sessionId, image.platform, saved[index].r2Key, saved[index].imageHash, saved[index].imageMimeType, input.bdUserId)),
     ];

@@ -19,6 +19,7 @@ export default function CollectPage() {
   const [city, setCity] = useState("");
   const [query, setQuery] = useState("");
   const [merchantId, setMerchantId] = useState("");
+  const [originalDeliveryFee, setOriginalDeliveryFee] = useState("");
   const [meituanFile, setMeituanFile] = useState<File | null>(null);
   const [bJiaFile, setBJiaFile] = useState<File | null>(null);
   const [status, setStatus] = useState<{ tone: "info" | "success" | "error"; text: string } | null>(null);
@@ -54,11 +55,11 @@ export default function CollectPage() {
   }
 
   async function submitCollection() {
-    if (!merchantId || !meituanFile || !bJiaFile || busy) return;
+    if (!merchantId || !meituanFile || !bJiaFile || !Number.isFinite(Number(originalDeliveryFee)) || Number(originalDeliveryFee) < 0 || busy) return;
     setBusy(true); setStatus({ tone: "info", text: "正在保存两张订单原图并创建采集任务…" });
     try {
       const form = new FormData();
-      form.set("merchantId", merchantId); form.set("meituanFile", meituanFile); form.set("bJiaFile", bJiaFile);
+      form.set("merchantId", merchantId); form.set("originalDeliveryFee", originalDeliveryFee); form.set("meituanFile", meituanFile); form.set("bJiaFile", bJiaFile);
       const result = await readJson(await fetch("/api/uploads", { method: "POST", body: form }));
       setStatus({ tone: "success", text: `采集任务已创建（${result.collectionSessionId}）。下一阶段将自动进入 AI 识别。` });
       setMeituanFile(null); setBJiaFile(null);
@@ -72,7 +73,7 @@ export default function CollectPage() {
     {!activeBd ? <section className="collection-card identity-card"><div><p className="eyebrow">01 · 身份</p><h2>选择我的身份</h2><span>仅能查看并采集自己负责的商家。</span></div><div className="identity-action"><select aria-label="选择我的身份" value={selectedBd} onChange={(event) => setSelectedBd(event.target.value)}><option value="">请选择 BD</option>{identities.map((identity) => <option value={identity.bdName} key={identity.bdName}>{identity.bdName}</option>)}</select><button className="primary" disabled={!selectedBd || busy} onClick={enterWorkspace}>{busy ? "正在进入…" : "进入采集工作区"}</button></div></section> : <>
       <section className="collection-card collection-context"><div><p className="eyebrow">当前采集人</p><strong>{activeBd}</strong><span>系统已限定为我的有效商家范围</span></div><button className="secondary" onClick={() => { setActiveBd(""); setMerchants([]); setMerchantId(""); }}>切换身份</button></section>
       <section className="collection-card"><div className="collection-card-heading"><div><p className="eyebrow">02 · 商家</p><h2>我负责的商家</h2></div><span>{merchants.length} 家匹配商家</span></div><div className="collection-filters"><label>城市<select value={city} onChange={(event) => setCity(event.target.value)}><option value="">全部城市</option>{cities.map((value) => <option value={value} key={value}>{value}</option>)}</select></label><label>商家搜索<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入商家 ID 或名称" /></label><label>选择商家<select value={merchantId} onChange={(event) => setMerchantId(event.target.value)}><option value="">请选择商家</option>{merchants.map((merchant) => <option value={merchant.merchantId} key={merchant.merchantId}>{merchant.cityName} · {merchant.merchantCode} · {merchant.merchantName}</option>)}</select></label></div>{selectedMerchant ? <div className="selected-merchant"><span>本次采集商家</span><strong>{selectedMerchant.merchantName}</strong><small>{selectedMerchant.cityName} · {selectedMerchant.merchantCode}</small></div> : null}</section>
-      <section className="collection-card"><div className="collection-card-heading"><div><p className="eyebrow">03 · 原图</p><h2>上传两张订单长图</h2></div><span>PNG / JPG / WebP · 单张不超过 1.8 MB</span></div><div className="dual-upload-grid"><UploadSlot title="美团订单长图" file={meituanFile} onChange={setMeituanFile} /><UploadSlot title="B 家订单长图" file={bJiaFile} onChange={setBJiaFile} /></div><button className="primary collection-submit" disabled={!merchantId || !meituanFile || !bJiaFile || busy} onClick={submitCollection}>{busy ? "正在创建采集任务…" : "保存原图并创建采集任务"}</button></section>
+      <section className="collection-card"><div className="collection-card-heading"><div><p className="eyebrow">03 · 配送费与原图</p><h2>填写原价配送费，再上传两张订单长图</h2></div><span>原价配送费由 BD 按商家实际配送价填写</span></div><div className="collection-filters"><label>原价配送费（元）<input aria-label="原价配送费" type="number" min="0" step="0.01" inputMode="decimal" value={originalDeliveryFee} onChange={(event) => setOriginalDeliveryFee(event.target.value)} placeholder="例如 5.00" /></label></div><div className="dual-upload-grid"><UploadSlot title="美团订单长图" file={meituanFile} onChange={setMeituanFile} /><UploadSlot title="B 家订单长图" file={bJiaFile} onChange={setBJiaFile} /></div><button className="primary collection-submit" disabled={!merchantId || !meituanFile || !bJiaFile || !Number.isFinite(Number(originalDeliveryFee)) || Number(originalDeliveryFee) < 0 || busy} onClick={submitCollection}>{busy ? "正在创建采集任务…" : "保存原图并创建采集任务"}</button></section>
     </>}
     {status ? <p className={`collection-notice ${status.tone}`}>{status.text}</p> : null}
   </main>;

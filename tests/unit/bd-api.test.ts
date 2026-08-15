@@ -45,6 +45,7 @@ describe("BD collection API", () => {
     const bucket = { put: async () => undefined, get: async () => null, delete: async () => undefined };
     const form = new FormData();
     form.set("merchantId", "merchant:玉林市:10009595");
+    form.set("originalDeliveryFee", "5");
     form.set("meituanFile", new File([new Uint8Array([1])], "meituan.png", { type: "image/png" }));
     form.set("bJiaFile", new File([new Uint8Array([2])], "bjia.jpg", { type: "image/jpeg" }));
     const response = await handleCollectionPost(new Request("http://localhost/api/uploads", { method: "POST", body: form }), {

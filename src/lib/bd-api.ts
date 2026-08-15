@@ -94,6 +94,8 @@ function asFile(value: FormDataEntryValue | null, name: string): File | NextResp
 export async function handleCollectionPost(request: Request, dependencies: CollectionApiDependencies) {
   const form = await request.formData();
   const merchantId = String(form.get("merchantId") ?? "").trim();
+  const originalDeliveryFee = Number(form.get("originalDeliveryFee"));
+  if (!Number.isFinite(originalDeliveryFee) || originalDeliveryFee < 0) return error("请填写有效的原价配送费", 400);
   if (!merchantId) return error("请选择商家", 400);
   const meituanFile = asFile(form.get("meituanFile"), "美团");
   const bJiaFile = asFile(form.get("bJiaFile"), "B 家");
@@ -107,6 +109,7 @@ export async function handleCollectionPost(request: Request, dependencies: Colle
       bucket: dependencies.bucket,
       bdUserId: dependencies.bd.userId,
       merchantId,
+      originalDeliveryFee,
       images: [
         { platform: "MEITUAN", imageHash: await sha256(meituanBytes), imageMimeType: meituanFile.type, bytes: new Uint8Array(meituanBytes) },
         { platform: "B_JIA", imageHash: await sha256(bJiaBytes), imageMimeType: bJiaFile.type, bytes: new Uint8Array(bJiaBytes) },

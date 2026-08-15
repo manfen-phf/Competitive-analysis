@@ -39,6 +39,7 @@ describe("BD dual-platform collection", () => {
       bucket: bucket as never,
       bdUserId: "bd:刘英安",
       merchantId: "merchant:玉林市:10009595",
+      originalDeliveryFee: 5,
       images: [
         { platform: "MEITUAN", imageHash: "a".repeat(64), imageMimeType: "image/png", bytes: new Uint8Array([1]) },
         { platform: "B_JIA", imageHash: "b".repeat(64), imageMimeType: "image/jpeg", bytes: new Uint8Array([2]) },
@@ -66,6 +67,7 @@ describe("BD dual-platform collection", () => {
       bucket: bucket as never,
       bdUserId: "bd:刘英安",
       merchantId: "merchant:玉林市:other",
+      originalDeliveryFee: 5,
       images: [
         { platform: "MEITUAN", imageHash: "a".repeat(64), imageMimeType: "image/png", bytes: new Uint8Array([1]) },
         { platform: "B_JIA", imageHash: "b".repeat(64), imageMimeType: "image/png", bytes: new Uint8Array([2]) },

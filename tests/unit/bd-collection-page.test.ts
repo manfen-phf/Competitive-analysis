@@ -10,6 +10,7 @@ describe("BD collection page", () => {
     expect(page).toContain("我负责的商家");
     expect(page).toContain("美团订单长图");
     expect(page).toContain("B 家订单长图");
+    expect(page).toContain("原价配送费");
     expect(page).toContain("/api/uploads");
   });
 });
