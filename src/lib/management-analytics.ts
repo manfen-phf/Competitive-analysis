@@ -72,10 +72,20 @@ export type ManagementRecord = {
   bdName: string;
   confirmedOrderId: string | null;
   goodsTotal: number | null;
+  dishPrice: number | null;
+  packagingFee: number | null;
+  merchantActivityAmount: number | null;
+  otherActivityAmount: number | null;
+  originalDeliveryFee: number | null;
+  deliveryFeeReduction: number | null;
+  paidDeliveryFee: number | null;
+  platformRedPacketAmount: number | null;
+  platformRedPacketMerchantShare: number | null;
   userPaidAmount: number | null;
   merchantSettlementAmount: number | null;
+  technicalServiceFee: number | null;
+  deliveryServiceFee: number | null;
   merchantRate: number | null;
-  otherActivityAmount: number | null;
 };
 
 const platforms: ManagementPlatform[] = ["MEITUAN", "B_JIA"];
@@ -254,7 +264,7 @@ export async function queryManagementRecords(db: D1Database, filters: Management
   const result = await db.prepare(`SELECT
       i."id" AS "uploadImageId", s."id" AS "collectionSessionId", i."platform" AS "platform", i."uploadedAt" AS "uploadedAt", i."r2Key" AS "r2Key", i."imageMimeType" AS "imageMimeType",
       r."status" AS "recognitionStatus", r."rawJson" AS "recognitionRawJson", m."id" AS "merchantId", m."name" AS "merchantName", c."name" AS "cityName", u."displayName" AS "bdName",
-      o."id" AS "confirmedOrderId", o."goodsTotal" AS "goodsTotal", o."userPaidAmount" AS "userPaidAmount", o."merchantSettlementAmount" AS "merchantSettlementAmount", o."merchantRate" AS "merchantRate", o."otherActivityAmount" AS "otherActivityAmount"
+      o."id" AS "confirmedOrderId", o."goodsTotal" AS "goodsTotal", o."dishPrice" AS "dishPrice", o."packagingFee" AS "packagingFee", o."merchantActivityAmount" AS "merchantActivityAmount", o."otherActivityAmount" AS "otherActivityAmount", o."originalDeliveryFee" AS "originalDeliveryFee", o."deliveryFeeReduction" AS "deliveryFeeReduction", o."paidDeliveryFee" AS "paidDeliveryFee", o."platformRedPacketAmount" AS "platformRedPacketAmount", o."platformRedPacketMerchantShare" AS "platformRedPacketMerchantShare", o."merchantSettlementAmount" AS "merchantSettlementAmount", o."userPaidAmount" AS "userPaidAmount", o."technicalServiceFee" AS "technicalServiceFee", o."deliveryServiceFee" AS "deliveryServiceFee", o."merchantRate" AS "merchantRate"
     FROM "CollectionSession" s
     JOIN "UploadImage" i ON i."collectionSessionId" = s."id"
     JOIN "Merchant" m ON m."id" = s."merchantId"
@@ -274,10 +284,20 @@ export async function queryManagementRecords(db: D1Database, filters: Management
       failureReason: recognitionFailureReason(row.recognitionStatus, row.recognitionRawJson),
       confirmedOrderId: row.confirmedOrderId ?? null,
       goodsTotal: numberOrNull(row.goodsTotal),
+      dishPrice: numberOrNull(row.dishPrice),
+      packagingFee: numberOrNull(row.packagingFee),
+      merchantActivityAmount: numberOrNull(row.merchantActivityAmount),
+      otherActivityAmount: numberOrNull(row.otherActivityAmount),
+      originalDeliveryFee: numberOrNull(row.originalDeliveryFee),
+      deliveryFeeReduction: numberOrNull(row.deliveryFeeReduction),
+      paidDeliveryFee: numberOrNull(row.paidDeliveryFee),
+      platformRedPacketAmount: numberOrNull(row.platformRedPacketAmount),
+      platformRedPacketMerchantShare: numberOrNull(row.platformRedPacketMerchantShare),
       userPaidAmount: numberOrNull(row.userPaidAmount),
       merchantSettlementAmount: numberOrNull(row.merchantSettlementAmount),
+      technicalServiceFee: numberOrNull(row.technicalServiceFee),
+      deliveryServiceFee: numberOrNull(row.deliveryServiceFee),
       merchantRate: numberOrNull(row.merchantRate),
-      otherActivityAmount: numberOrNull(row.otherActivityAmount),
     };
   });
 }

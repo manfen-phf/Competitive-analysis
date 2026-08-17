@@ -20,4 +20,12 @@ describe("BD collection page", () => {
     expect(page).not.toContain('"orderNumber", "goodsTotal"');
     expect(page).not.toContain('orderNumber: "订单号"');
   });
+
+  it("states the collection flow in the order a BD actually uses it", () => {
+    const page = readFileSync(join(process.cwd(), "src/app/collect/page.tsx"), "utf8");
+
+    expect(page).toContain("\\u9009\\u62e9\\u5546\\u5bb6");
+    expect(page).toContain("\\u4e0a\\u4f20\\u53cc\\u5e73\\u53f0\\u622a\\u56fe");
+    expect(page).toContain("\\u8bc6\\u522b\\u5e76\\u786e\\u8ba4");
+  });
 });

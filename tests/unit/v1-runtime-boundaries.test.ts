@@ -26,7 +26,8 @@ describe("V1 runtime boundaries", () => {
         route.endsWith(join("analytics", "route.ts")) ||
         route.endsWith(join("filter-options", "route.ts")) ||
         route.endsWith(join("merchants", "route.ts")) ||
-        route.endsWith(join("records", "route.ts"))
+        route.endsWith(join("records", "route.ts")) ||
+        route.endsWith(join("records", "[id]", "image", "route.ts"))
       ) {
         expect(source).not.toContain("p0Unavailable");
       } else {

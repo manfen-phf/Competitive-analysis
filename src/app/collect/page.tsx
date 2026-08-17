@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 type BdIdentity = { bdName: string };
 type Merchant = { merchantId: string; merchantCode: string; merchantName: string; cityName: string };
+const collectionStages = ["\u9009\u62e9\u5546\u5bb6", "\u4e0a\u4f20\u53cc\u5e73\u53f0\u622a\u56fe", "\u8bc6\u522b\u5e76\u786e\u8ba4"];
 
 async function readJson(response: Response) {
   const data = await response.json().catch(() => ({}));
@@ -69,7 +70,7 @@ export default function CollectPage() {
   }
 
   return <main className="collection-page">
-    <header className="collection-heading"><div><p>订单采集</p><h1>一次采集，完成双平台对照</h1><span>只需选择名下商家，再上传美团与 B 家的订单长图。系统会保存证据并在下一步识别数据。</span></div><span className="collection-stage">P0-2 · 采集入库</span></header>
+    <header className="collection-heading"><div><p>订单采集</p><h1>一次采集，完成双平台对照</h1><span>只需选择名下商家，再上传美团与 B 家的订单长图。系统会保存证据并在下一步识别数据。</span><ol className="collection-flow" aria-label="采集流程">{collectionStages.map((stage, index) => <li key={stage}><b>{index + 1}</b>{stage}</li>)}</ol></div><span className="collection-stage">P0-2 · 采集入库</span></header>
     {!activeBd ? <section className="collection-card identity-card"><div><p className="eyebrow">01 · 身份</p><h2>选择我的身份</h2><span>仅能查看并采集自己负责的商家。</span></div><div className="identity-action"><select aria-label="选择我的身份" value={selectedBd} onChange={(event) => setSelectedBd(event.target.value)}><option value="">请选择 BD</option>{identities.map((identity) => <option value={identity.bdName} key={identity.bdName}>{identity.bdName}</option>)}</select><button className="primary" disabled={!selectedBd || busy} onClick={enterWorkspace}>{busy ? "正在进入…" : "进入采集工作区"}</button></div></section> : <>
       <section className="collection-card collection-context"><div><p className="eyebrow">当前采集人</p><strong>{activeBd}</strong><span>系统已限定为我的有效商家范围</span></div><button className="secondary" onClick={() => { setActiveBd(""); setMerchants([]); setMerchantId(""); }}>切换身份</button></section>
       <section className="collection-card"><div className="collection-card-heading"><div><p className="eyebrow">02 · 商家</p><h2>我负责的商家</h2></div><span>{merchants.length} 家匹配商家</span></div><div className="collection-filters"><label>城市<select value={city} onChange={(event) => setCity(event.target.value)}><option value="">全部城市</option>{cities.map((value) => <option value={value} key={value}>{value}</option>)}</select></label><label>商家搜索<input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="输入商家 ID 或名称" /></label><label>选择商家<select value={merchantId} onChange={(event) => setMerchantId(event.target.value)}><option value="">请选择商家</option>{merchants.map((merchant) => <option value={merchant.merchantId} key={merchant.merchantId}>{merchant.cityName} · {merchant.merchantCode} · {merchant.merchantName}</option>)}</select></label></div>{selectedMerchant ? <div className="selected-merchant"><span>本次采集商家</span><strong>{selectedMerchant.merchantName}</strong><small>{selectedMerchant.cityName} · {selectedMerchant.merchantCode}</small></div> : null}</section>

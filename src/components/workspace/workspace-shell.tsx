@@ -7,7 +7,7 @@ import { WorkspaceRail } from "./workspace-rail";
 export interface WorkspaceShellProps { children: ReactNode; contextLabel: string; rightPanel?: ReactNode; }
 
 export function WorkspaceShell({ children, contextLabel, rightPanel }: WorkspaceShellProps) {
-  const [railExpanded, setRailExpanded] = useState(true);
+  const [railExpanded, setRailExpanded] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
   const hasRightPanel = rightPanel !== undefined;
   const closeCommand = useCallback(() => setCommandOpen(false), []);
@@ -35,8 +35,8 @@ export function WorkspaceShell({ children, contextLabel, rightPanel }: Workspace
       </header>
       <div className="workspace-main" id="workspace-main" tabIndex={-1}>{children}</div>
     </div>
-    {hasRightPanel ? <aside className="workspace-panel" aria-label={"AI \u534f\u4f5c\u9762\u677f"}>{rightPanel}</aside> : null}
-    <nav className="workspace-mobile-nav" aria-label={"\u79fb\u52a8\u5bfc\u822a"}><a href="/">{"\u9996\u9875"}</a><a href="/upload">{"\u5de5\u4f5c"}</a><button type="button" onClick={() => setCommandOpen(true)}>AI</button><a href="/records">{"\u6d88\u606f"}</a><a href="/admin/import">{"\u6211\u7684"}</a></nav>
+    {hasRightPanel ? <aside className="workspace-panel" aria-label={"\u91c7\u96c6\u6307\u5f15"}>{rightPanel}</aside> : null}
+    <nav className="workspace-mobile-nav" aria-label={"\u79fb\u52a8\u5bfc\u822a"}><a href="/">{"\u6982\u89c8"}</a><a href="/collect">{"\u91c7\u96c6"}</a><a href="/dashboard">{"\u5206\u6790"}</a><a href="/records">{"\u6570\u636e"}</a><a href="/admin/import">{"\u4e3b\u6570\u636e"}</a></nav>
     <CommandPalette open={commandOpen} onClose={closeCommand} />
   </div>;
 }

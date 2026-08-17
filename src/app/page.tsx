@@ -23,13 +23,13 @@ export default function Home() {
   const topMerchants = overview.orders.merchantRanking.filter((item) => item.userPaidDifference > 0).slice(0, 2);
   return <main className="operations-home workspace-home">
     <header className="home-hero">
-      <div><h1>{overview.collection.uploadImageCount ? "今天，先处理三件重要的事。" : "从第一组商家订单开始。"}</h1><p>{overview.collection.uploadImageCount ? "基于已确认的双平台订单，为你整理采集进度、价差和需要关注的商家。" : "上传同一商家的美团与 B 家订单截图，确认识别结果后，竞争定价数据会在这里出现。"}</p></div>
+      <div><p className="eyebrow">{"\u6982\u89c8"}</p><h1>{"\u4eca\u65e5\u91c7\u96c6\u6982\u89c8"}</h1><p>{overview.collection.uploadImageCount ? "\u67e5\u770b\u4e0a\u4f20\u3001\u8bc6\u522b\u548c\u786e\u8ba4\u7684\u771f\u5b9e\u8fdb\u5ea6\uff0c\u4ece\u7b49\u5f85\u5904\u7406\u7684\u56fe\u7247\u5f00\u59cb\u3002" : "\u9009\u62e9\u4e00\u5bb6\u5546\u5bb6\uff0c\u4e0a\u4f20\u7f8e\u56e2\u4e0e B \u5bb6\u622a\u56fe\uff0c\u786e\u8ba4\u8bc6\u522b\u540e\u5373\u53ef\u8fdb\u5165\u5bf9\u6bd4\u5206\u6790\u3002"}</p></div>
       <div className="score-orbit" style={{ "--score": `${score * 3.6}deg` } as CSSProperties}><strong>{score}</strong><span>采集健康度</span><small>{overview.collection.uploadImageCount ? `已确认 ${overview.collection.confirmedImageCount} 张` : "等待采集"}</small></div>
     </header>
     <section className="home-actions" aria-label="快速操作">
-      <Link href="/dashboard"><i className="action-icon merchants">◌</i><span><b>查看重点商家</b><small>定位存在价格差异的商家</small></span><em>→</em></Link>
-      <Link href="/health"><i className="action-icon progress">↗</i><span><b>查看采集进度</b><small>跟进识别、确认和成对完成情况</small></span><em>→</em></Link>
-      <Link href="/upload"><i className="action-icon upload">↑</i><span><b>上传订单截图</b><small>开始一组美团与 B 家采集</small></span><em>→</em></Link>
+      <Link href="/collect"><i className="action-icon upload">↑</i><span><b>{"\u5f00\u59cb\u91c7\u96c6"}</b><small>{"\u9009\u62e9\u5546\u5bb6\uff0c\u4e0a\u4f20\u53cc\u5e73\u53f0\u8ba2\u5355\u622a\u56fe"}</small></span><em>→</em></Link>
+      <Link href="/records"><i className="action-icon progress">↗</i><span><b>{"\u5f85\u786e\u8ba4\u8bc6\u522b"}</b><small>{"\u590d\u6838 AI \u7ed3\u679c\uff0c\u5b8c\u6210\u5165\u5e93"}</small></span><em>→</em></Link>
+      <Link href="/dashboard"><i className="action-icon merchants">◌</i><span><b>{"\u67e5\u770b\u4ef7\u683c\u5206\u6790"}</b><small>{"\u6839\u636e\u5df2\u786e\u8ba4\u6570\u636e\u67e5\u770b\u7ade\u5bf9\u5dee\u5f02"}</small></span><em>→</em></Link>
     </section>
     <section className="home-core-grid">
       <article className="home-health"><div className="section-title"><h2>采集信号</h2><span>实时</span></div><div className="health-body"><div className="mini-orbit"><strong>{score}</strong><small>完成度</small></div><div className="signal-bars"><Signal label="识别成功" value={overview.collection.recognizedImageCount} total={overview.collection.uploadImageCount} /><Signal label="人工确认" value={overview.collection.confirmedImageCount} total={overview.collection.uploadImageCount} /><Signal label="成对采集" value={overview.collection.pairedCollectionCount} total={Math.max(overview.collection.pairedCollectionCount + overview.collection.incompleteCollectionCount, 1)} /></div></div></article>
