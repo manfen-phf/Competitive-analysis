@@ -11,7 +11,7 @@ const routeState = vi.hoisted(() => ({
   collection: undefined as undefined | ReturnType<typeof collection>,
   created: undefined as undefined | Record<string, unknown>,
   uploaded: undefined as undefined | Record<string, unknown>,
-  existingUpload: undefined as undefined | { id: string; imageFileId: string; storageReference: string | null; imageMimeType: string; imageHash: string; platform: string | null; uploadedAt: Date; collection: { merchantName: string } },
+  existingUpload: undefined as undefined | { id: string; imageFileId: string; storageReference: string | null; imageMimeType: string; imageHash: string; platform: string | null; uploadedAt: Date; collection: { merchantName: string; createdAt: Date } },
 }));
 
 vi.mock("@/lib/auth", () => ({ getSession: async () => routeState.user }));
@@ -109,7 +109,7 @@ describe("paired collection confirmation", () => {
   it("records a visible duplicate status without attaching the original image to the new collection", async () => {
     routeState.existingUpload = {
       id: "existing-upload", imageFileId: "cloud://image", storageReference: "cloud://image", imageMimeType: "image/png", imageHash: "a".repeat(64), platform: "MEITUAN", uploadedAt: new Date("2026-08-22T08:00:00Z"),
-      collection: { merchantName: "其他商家" },
+      collection: { merchantName: "其他商家", createdAt: new Date("2026-08-22T08:00:00Z") },
     };
     const form = new FormData();
     form.set("platform", "MEITUAN");
@@ -118,6 +118,7 @@ describe("paired collection confirmation", () => {
 
     expect(response.status).toBe(409);
     expect(routeState.uploaded).toBeUndefined();
+    await expect(response.json()).resolves.toMatchObject({ status: "DUPLICATE", duplicateOf: { merchantName: "其他商家", platform: "MEITUAN", uploadedAt: "2026-08-22T08:00:00.000Z" } });
   });
 
   it("rejects confirmation unless both platform images are recognized", async () => {

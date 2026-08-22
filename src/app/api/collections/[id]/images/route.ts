@@ -39,7 +39,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try { await prisma.imageHashReservation.create({ data: { imageHash: hash } }); }
   catch {
     const duplicate = await prisma.upload.findFirst({ where: { imageHash: hash }, include: { collection: { select: { merchantName: true, createdAt: true } } } });
-    return NextResponse.json({ status: "DUPLICATE", error: "该截图已有采集记录，请更换截图", duplicateOf: duplicate ? { merchantName: duplicate.collection.merchantName, platform: duplicate.platform, collectedAt: duplicate.collection.createdAt } : undefined }, { status: 409 });
+    return NextResponse.json({ status: "DUPLICATE", error: "该截图已有采集记录，请更换截图", duplicateOf: duplicate ? { merchantName: duplicate.collection.merchantName, platform: duplicate.platform, uploadedAt: duplicate.collection.createdAt } : undefined }, { status: 409 });
   }
 
   const updateTask = async (status: string) => {

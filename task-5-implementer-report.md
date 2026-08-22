@@ -41,3 +41,5 @@
 - Guarded collection upload status writes with a conditional non-confirmed update; a confirmation race returns conflict and removes the just-created upload rather than regressing `CONFIRMED`.
 - Confirmed retries now prove persisted `CONFIRMED` plus exactly two collection orders before success; legacy/incomplete confirmations remain conflicts.
 - Expanded D1 migration regression through migrations 0001–0007, including the new column/table and a duplicate reservation uniqueness check. Duplicate responses now include only safe merchant/platform/collection-time metadata.
+
+- Standardized duplicate audit time as `duplicateOf.uploadedAt`, matching the collection UI display contract; the regression test covers the safe merchant/platform/time payload.
