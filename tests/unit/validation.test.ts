@@ -22,6 +22,15 @@ describe("validateRecognition", () => {
     expect(validateRecognition({ ...validPayload, orderNumber: undefined }).ok).toBe(true);
   });
 
+  it("accepts a zero paid delivery fee when the delivery reduction exceeds the original fee", () => {
+    expect(validateRecognition({
+      ...validPayload,
+      originalDeliveryFee: 5.5,
+      deliveryFeeReduction: 6,
+      paidDeliveryFee: 0,
+    }).ok).toBe(true);
+  });
+
   it("rejects inconsistent delivery fees", () => {
     expect(validateRecognition({ ...validPayload, paidDeliveryFee: 3 }).ok).toBe(false);
   });

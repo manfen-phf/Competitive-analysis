@@ -65,4 +65,32 @@ describe("validateCollectionForConfirmation", () => {
       ],
     })).toEqual({ ok: true, fieldErrors: {} });
   });
+
+  it("accepts a later successful retry with a goods total regardless of image order", () => {
+    expect(validateCollectionForConfirmation({
+      ...baseDraft,
+      images: [
+        {
+          platform: "MEITUAN",
+          recognitionStatus: "SUCCEEDED",
+          recognitionResult: {},
+        },
+        {
+          platform: "B_JIA",
+          recognitionStatus: "FAILED",
+          recognitionResult: null,
+        },
+        {
+          platform: "B_JIA",
+          recognitionStatus: "SUCCEEDED",
+          recognitionResult: { goodsTotal: 31.5 },
+        },
+        {
+          platform: "MEITUAN",
+          recognitionStatus: "SUCCEEDED",
+          recognitionResult: { goodsTotal: 28 },
+        },
+      ],
+    })).toEqual({ ok: true, fieldErrors: {} });
+  });
 });

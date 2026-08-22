@@ -15,6 +15,7 @@ export function validateRecognition(payload: unknown): { ok: boolean; reason?: s
   if (!parsed.success) return { ok: false, reason: "字段缺失或金额格式错误" };
   const data = parsed.data;
   if (data.confidence < 0.8) return { ok: false, reason: "识别置信度不足" };
-  if (Math.abs(data.originalDeliveryFee - data.deliveryFeeReduction - data.paidDeliveryFee) > 0.02) return { ok: false, reason: "配送费金额关系不一致" };
+  const expectedPaidDeliveryFee = Math.max(data.originalDeliveryFee - data.deliveryFeeReduction, 0);
+  if (Math.abs(expectedPaidDeliveryFee - data.paidDeliveryFee) > 0.02) return { ok: false, reason: "配送费金额关系不一致" };
   return { ok: true };
 }

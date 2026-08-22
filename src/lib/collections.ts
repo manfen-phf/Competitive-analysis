@@ -42,9 +42,16 @@ const platformLabels: Record<UploadPlatform, string> = {
 
 function fieldErrorForPlatform(images: PlatformImage[], platform: UploadPlatform): CollectionFieldErrors {
   const matchingImages = images.filter((image) => image.platform === platform);
-  const successfulImage = matchingImages.find((image) => image.recognitionStatus === "SUCCEEDED");
+  const successfulImage = matchingImages.find((image) => (
+    image.recognitionStatus === "SUCCEEDED"
+    && typeof image.recognitionResult?.goodsTotal === "number"
+    && Number.isFinite(image.recognitionResult.goodsTotal)
+  ));
 
   if (!successfulImage) {
+    const hasSuccessfulImage = matchingImages.some((image) => image.recognitionStatus === "SUCCEEDED");
+    if (hasSuccessfulImage) return { [platform]: { goodsTotal: "请补充商品总价" } };
+
     return {
       [platform]: {
         image: matchingImages.length === 0
@@ -52,11 +59,6 @@ function fieldErrorForPlatform(images: PlatformImage[], platform: UploadPlatform
           : `${platformLabels[platform]}截图尚未识别成功`,
       },
     };
-  }
-
-  const goodsTotal = successfulImage.recognitionResult?.goodsTotal;
-  if (typeof goodsTotal !== "number" || !Number.isFinite(goodsTotal)) {
-    return { [platform]: { goodsTotal: "请补充商品总价" } };
   }
 
   return {};
