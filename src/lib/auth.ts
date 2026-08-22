@@ -21,7 +21,22 @@ export const SESSION_COOKIE_NAME = "competition_session";
 const PASSWORD_KEY_LENGTH = 64;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const scrypt = promisify(scryptCallback);
+const BOOTSTRAP_SENTINEL_ID = "first-super-admin";
 let bootstrapInFlight: Promise<void> | undefined;
+
+type BootstrapUser = { username: string; passwordHash: string; role: "SUPER_ADMIN" };
+type BootstrapTransaction = {
+  appUser: {
+    count: () => Promise<number>;
+    create: (input: { data: BootstrapUser }) => Promise<unknown>;
+  };
+  appBootstrap: {
+    create: (input: { data: { id: string } }) => Promise<unknown>;
+  };
+};
+type BootstrapDatabase = {
+  $transaction: <T>(operation: (transaction: BootstrapTransaction) => Promise<T>) => Promise<T>;
+};
 
 function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
@@ -110,9 +125,30 @@ export async function getSession(): Promise<SessionUser | null> {
   };
 }
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
+export async function bootstrapFirstSuperAdmin(
+  database: BootstrapDatabase,
+  user: Pick<BootstrapUser, "username" | "passwordHash">,
+) {
+  try {
+    return await database.$transaction(async (transaction) => {
+      if (await transaction.appUser.count()) return false;
+
+      await transaction.appBootstrap.create({ data: { id: BOOTSTRAP_SENTINEL_ID } });
+      await transaction.appUser.create({ data: { ...user, role: "SUPER_ADMIN" } });
+      return true;
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) return false;
+    throw error;
+  }
+}
+
 async function createBootstrapSuperAdmin() {
   const prisma = await getPrisma();
-  if (await prisma.appUser.count()) return;
 
   const [username, password] = await Promise.all([
     getRuntimeSecret("SUPER_ADMIN_BOOTSTRAP_USERNAME"),
@@ -120,18 +156,10 @@ async function createBootstrapSuperAdmin() {
   ]);
   if (!username || !password) return;
 
-  try {
-    await prisma.appUser.create({
-      data: {
-        username,
-        passwordHash: await hashPassword(password),
-        role: "SUPER_ADMIN",
-      },
-    });
-  } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") return;
-    throw error;
-  }
+  await bootstrapFirstSuperAdmin(prisma as unknown as BootstrapDatabase, {
+    username,
+    passwordHash: await hashPassword(password),
+  });
 }
 
 export async function ensureBootstrapSuperAdmin() {
@@ -142,4 +170,12 @@ export async function ensureBootstrapSuperAdmin() {
   }
 
   await bootstrapInFlight;
+}
+
+export async function initializeAuthentication() {
+  try {
+    await ensureBootstrapSuperAdmin();
+  } catch {
+    // Requests remain available while the database or runtime bindings initialize.
+  }
 }

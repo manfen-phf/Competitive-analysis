@@ -33,6 +33,11 @@ model AppSession {
   @@index([expiresAt])
 }
 
+model AppBootstrap {
+  id        String   @id
+  createdAt DateTime @default(now())
+}
+
 model MasterDataVersion {
   id          String               @id @default(cuid())
   importedAt  DateTime             @default(now())

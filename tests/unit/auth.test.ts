@@ -12,9 +12,11 @@ const state = vi.hoisted(() => ({
   deletedSessionWhere: undefined as { tokenHash: string } | undefined,
   userCount: 0,
   createdUser: undefined as { data: { username: string; passwordHash: string; role: string } } | undefined,
+  bootstrapSentinelCreated: false,
   createCalls: 0,
   countCalls: 0,
   createError: undefined as unknown,
+  getPrismaError: undefined as unknown,
   secrets: {} as Record<string, string | undefined>,
 }));
 
@@ -31,7 +33,35 @@ vi.mock("next/headers", () => ({
 }));
 
 vi.mock("@/lib/db", () => ({
-  getPrisma: async () => ({
+  getPrisma: async () => {
+    if (state.getPrismaError) throw state.getPrismaError;
+    const transaction = async <T,>(callback: (tx: {
+      appUser: {
+        count: () => Promise<number>;
+        create: (input: { data: { username: string; passwordHash: string; role: string } }) => Promise<void>;
+      };
+      appBootstrap: { create: () => Promise<void> };
+    }) => Promise<T>) => callback({
+      appUser: {
+        count: async () => {
+          state.countCalls += 1;
+          return state.userCount;
+        },
+        create: async (input) => {
+          state.createCalls += 1;
+          if (state.createError) throw state.createError;
+          state.createdUser = input;
+        },
+      },
+      appBootstrap: {
+        create: async () => {
+          if (state.bootstrapSentinelCreated) throw { code: "P2002" };
+          state.bootstrapSentinelCreated = true;
+        },
+      },
+    });
+    return {
+      $transaction: transaction,
     appSession: {
       findUnique: async () => state.session,
       create: async (input: { data: { tokenHash: string; userId: string; expiresAt: Date } }) => {
@@ -52,7 +82,8 @@ vi.mock("@/lib/db", () => ({
         state.createdUser = input;
       },
     },
-  }),
+    };
+  },
 }));
 
 vi.mock("@/lib/runtime-secrets", () => ({
@@ -61,11 +92,13 @@ vi.mock("@/lib/runtime-secrets", () => ({
 
 import {
   clearSession,
+  bootstrapFirstSuperAdmin,
   createSession,
   ensureBootstrapSuperAdmin,
   getSession,
   hasValidAccountScope,
   hashPassword,
+  initializeAuthentication,
   verifyPassword,
 } from "@/lib/auth";
 
@@ -78,11 +111,58 @@ beforeEach(() => {
   state.deletedSessionWhere = undefined;
   state.userCount = 0;
   state.createdUser = undefined;
+  state.bootstrapSentinelCreated = false;
   state.createCalls = 0;
   state.countCalls = 0;
   state.createError = undefined;
+  state.getPrismaError = undefined;
   state.secrets = {};
 });
+
+function createDurableBootstrapDatabase(options?: { failFirstUserCreate?: boolean }) {
+  const database = { hasSentinel: false, users: [] as Array<{ username: string; passwordHash: string; role: string }> };
+  let failFirstUserCreate = options?.failFirstUserCreate ?? false;
+  let transactionQueue = Promise.resolve();
+
+  const client = () => ({
+    $transaction: <T,>(callback: (tx: {
+      appUser: {
+        count: () => Promise<number>;
+        create: (input: { data: { username: string; passwordHash: string; role: string } }) => Promise<void>;
+      };
+      appBootstrap: { create: () => Promise<void> };
+    }) => Promise<T>) => {
+      const transaction = transactionQueue.then(async () => {
+        const staged = { hasSentinel: database.hasSentinel, users: [...database.users] };
+        const result = await callback({
+          appUser: {
+            count: async () => staged.users.length,
+            create: async ({ data }) => {
+              if (failFirstUserCreate) {
+                failFirstUserCreate = false;
+                throw new Error("simulated user insert failure");
+              }
+              staged.users.push(data);
+            },
+          },
+          appBootstrap: {
+            create: async () => {
+              if (staged.hasSentinel) throw { code: "P2002" };
+              staged.hasSentinel = true;
+            },
+          },
+        });
+        database.hasSentinel = staged.hasSentinel;
+        database.users = staged.users;
+        return result;
+      });
+      transactionQueue = transaction.then(() => undefined, () => undefined);
+      return transaction;
+    },
+  });
+
+  return { client, database };
+}
 
 describe("password helpers", () => {
   it("verifies the original password but rejects a different password", async () => {
@@ -118,7 +198,6 @@ describe("getSession", () => {
       city: "玉林",
       bdName: "张三",
     });
-    expect(state.countCalls).toBe(1);
   });
 });
 
@@ -222,5 +301,36 @@ describe("bootstrap super administrator", () => {
     state.createError = { code: "P2002" };
 
     await expect(ensureBootstrapSuperAdmin()).resolves.toBeUndefined();
+  });
+
+  it("allows only one of two independent instances to acquire a durable bootstrap sentinel", async () => {
+    const durable = createDurableBootstrapDatabase();
+
+    await Promise.all([
+      bootstrapFirstSuperAdmin(durable.client(), { username: "admin-a", passwordHash: "hash-a" }),
+      bootstrapFirstSuperAdmin(durable.client(), { username: "admin-b", passwordHash: "hash-b" }),
+    ]);
+
+    expect(durable.database.hasSentinel).toBe(true);
+    expect(durable.database.users).toHaveLength(1);
+    expect(durable.database.users[0]?.role).toBe("SUPER_ADMIN");
+  });
+
+  it("rolls back the sentinel when its first user insert fails", async () => {
+    const durable = createDurableBootstrapDatabase({ failFirstUserCreate: true });
+
+    await expect(bootstrapFirstSuperAdmin(durable.client(), { username: "admin-a", passwordHash: "hash-a" })).rejects.toThrow("simulated user insert failure");
+    expect(durable.database.hasSentinel).toBe(false);
+
+    await expect(bootstrapFirstSuperAdmin(durable.client(), { username: "admin-b", passwordHash: "hash-b" })).resolves.toBe(true);
+    expect(durable.database.users).toHaveLength(1);
+  });
+});
+
+describe("authentication initialization", () => {
+  it("does not fail the application request when bootstrap dependencies are unavailable", async () => {
+    state.getPrismaError = new Error("database unavailable");
+
+    await expect(initializeAuthentication()).resolves.toBeUndefined();
   });
 });
