@@ -88,7 +88,7 @@ model Upload {
   id            String              @id @default(cuid())
   legacyImageData Bytes?
   imageMimeType String
-  imageHash     String              @unique
+  imageHash     String
   imageAccessToken String         @unique
   uploadedAt DateTime            @default(now())
   order      OrderRecord?
@@ -101,6 +101,7 @@ model Upload {
   storageReference String?
 
   @@index([collectionId, platform])
+  @@index([imageHash])
   @@index([recognitionStatus])
   failure    RecognitionFailure?
 }

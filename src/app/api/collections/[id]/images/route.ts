@@ -1,0 +1,89 @@
+import { randomUUID } from "node:crypto";
+import { NextRequest, NextResponse } from "next/server";
+
+import { getSession } from "@/lib/auth";
+import { getPrisma } from "@/lib/db";
+import { imageHash } from "@/lib/dedup";
+import { recognizeOrderScreenshot } from "@/lib/ocr";
+import { canMutateCollection } from "@/lib/permissions";
+import { saveScreenshotToCloudStorage } from "@/lib/cloudbase-storage";
+import { assertSupportedScreenshot, imageDataUrl } from "@/lib/storage";
+import { validateRecognition } from "@/lib/validation";
+
+const platforms = new Set(["MEITUAN", "B_JIA"]);
+
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  const { id } = await context.params;
+  const form = await request.formData();
+  const platform = String(form.get("platform") ?? "");
+  const files = form.getAll("file");
+  const file = files[0];
+  if (!platforms.has(platform) || files.length !== 1 || !(file instanceof File)) {
+    return NextResponse.json({ error: "请明确选择平台并上传一张截图" }, { status: 400 });
+  }
+
+  const prisma = await getPrisma();
+  const collection = await prisma.collectionTask.findUnique({
+    where: { id },
+    include: { uploads: { select: { platform: true, recognitionStatus: true } } },
+  });
+  if (!collection) return NextResponse.json({ error: "采集任务不存在" }, { status: 404 });
+  if (!canMutateCollection(user, collection)) return NextResponse.json({ error: "无权操作此采集任务" }, { status: 403 });
+  if (collection.status === "CONFIRMED") return NextResponse.json({ error: "该采集任务已确认" }, { status: 400 });
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  try { assertSupportedScreenshot(bytes, file.type); }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : "截图不符合要求" }, { status: 400 }); }
+  const hash = imageHash(bytes);
+  const existing = await prisma.upload.findFirst({
+    where: { imageHash: hash },
+    include: { collection: { select: { merchantName: true } } },
+  });
+  if (existing) {
+    const duplicate = await prisma.upload.create({
+      data: {
+        collectionId: id,
+        platform,
+        recognitionStatus: "DUPLICATE",
+        imageFileId: existing.imageFileId,
+        imageMimeType: existing.imageMimeType,
+        imageHash: hash,
+        imageAccessToken: randomUUID(),
+        storageReference: existing.storageReference ?? existing.imageFileId,
+      },
+    });
+    return NextResponse.json({
+      status: "DUPLICATE",
+      upload: duplicate,
+      duplicateOf: { merchantName: existing.collection.merchantName, platform: existing.platform, uploadedAt: existing.uploadedAt },
+    }, { status: 409 });
+  }
+
+  let uploadId: string | undefined;
+  try {
+    await prisma.collectionTask.update({ where: { id }, data: { status: "UPLOADING" } });
+    const imageFileId = await saveScreenshotToCloudStorage(bytes, file.type, hash);
+    const upload = await prisma.upload.create({
+      data: { collectionId: id, platform, recognitionStatus: "PROCESSING", imageFileId, imageMimeType: file.type, imageHash: hash, imageAccessToken: randomUUID(), storageReference: imageFileId },
+    });
+    uploadId = upload.id;
+    await prisma.collectionTask.update({ where: { id }, data: { status: "RECOGNIZING" } });
+    const recognition = await recognizeOrderScreenshot(imageDataUrl(bytes, file.type));
+    const validation = validateRecognition(recognition);
+    if (!validation.ok) throw new Error(validation.reason);
+    await prisma.upload.update({ where: { id: upload.id }, data: { recognitionStatus: "SUCCEEDED", recognitionResult: JSON.stringify(recognition) } });
+
+    const ready = (["MEITUAN", "B_JIA"] as const).every((candidate) => candidate === platform || collection.uploads.some((image) => image.platform === candidate && image.recognitionStatus === "SUCCEEDED"));
+    await prisma.collectionTask.update({ where: { id }, data: { status: ready ? "READY_TO_CONFIRM" : "DRAFT" } });
+    return NextResponse.json({ status: "SUCCEEDED", upload: { id: upload.id, platform, recognitionStatus: "SUCCEEDED", recognitionResult: recognition } }, { status: 201 });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "图片识别失败";
+    if (!uploadId) return NextResponse.json({ status: "FAILED", error: "截图存储服务暂不可用，请稍后重试" }, { status: 503 });
+    await prisma.upload.update({ where: { id: uploadId }, data: { recognitionStatus: "FAILED" } });
+    await prisma.recognitionFailure.upsert({ where: { uploadId }, create: { uploadId, reason }, update: { reason } });
+    await prisma.collectionTask.update({ where: { id }, data: { status: "FAILED" } });
+    return NextResponse.json({ status: "FAILED", error: reason }, { status: 422 });
+  }
+}

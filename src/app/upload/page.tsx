@@ -1,6 +1,6 @@
 import { AuthenticationRequiredError, requireWorkspaceUser } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import Upload from "./page.client";
+import Upload from "./upload.client";
 
 const ALL = ["SUPER_ADMIN", "CITY_ADMIN", "BD"] as const;
 

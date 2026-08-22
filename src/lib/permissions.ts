@@ -14,6 +14,10 @@ export function canMutateOrder(user: PermissionUser, order: ScopedOrder) {
   return user.role === "BD" && user.city === order.city && user.bdName === order.bdName;
 }
 
+export function canMutateCollection(user: PermissionUser, collection: ScopedOrder) {
+  return canMutateOrder(user, collection);
+}
+
 export function canExportCity(user: PermissionUser, city: string) {
   return user.role === "SUPER_ADMIN" || (user.role === "CITY_ADMIN" && user.city === city);
 }
