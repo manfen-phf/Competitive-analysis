@@ -8,6 +8,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum AppRole {
+  SUPER_ADMIN
+  CITY_ADMIN
+  BD
+}
+
+model AppUser {
+  id           String       @id @default(cuid())
+  username     String       @unique
+  passwordHash String
+  role         AppRole
+  city         String?
+  bdName       String?
+  sessions     AppSession[]
+
+  @@index([role, city])
+  @@index([bdName])
+}
+
+model AppSession {
+  id        String   @id @default(cuid())
+  tokenHash String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+}
+
 model MasterDataVersion {
   id          String               @id @default(cuid())
   importedAt  DateTime             @default(now())
