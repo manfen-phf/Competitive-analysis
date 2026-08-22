@@ -4,6 +4,7 @@ import { NextRequest } from "next/server";
 import { confirmCollection } from "@/lib/collection-confirmation";
 import { canMutateCollection } from "@/lib/permissions";
 import { validateRecognitionPlatform } from "@/lib/validation";
+import { updateCollectionUploadTaskStatus } from "@/lib/collection-upload-state";
 
 const routeState = vi.hoisted(() => ({
   user: null as null | { id: string; username: string; role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD"; city: string | null; bdName: string | null },
@@ -167,5 +168,41 @@ describe("paired collection confirmation", () => {
     const response = await confirmCollection({ collection: collection(), user: bdUser, reviews: reviews(), database: db });
     expect(response).toMatchObject({ ok: true, orderCount: 2 });
     expect(db.state.status).toBe("CONFIRMED");
+  });
+
+  it("keeps a paired MEITUAN/B_JIA upload ready when the first completion resumes after its success count", async () => {
+    let status = "RECOGNIZING";
+    let releaseDraft: (() => void) | undefined;
+    const draftPaused = new Promise<void>((resolve) => { releaseDraft = resolve; });
+    let pauseReached: (() => void) | undefined;
+    const draftReached = new Promise<void>((resolve) => { pauseReached = resolve; });
+    const task = { updateMany: async ({ where, data }: { where: { status: { in?: string[]; not?: string } }; data: { status: string } }) => {
+      if (data.status === "DRAFT") {
+        pauseReached?.();
+        await draftPaused;
+      }
+      const allowed = where.status.in ? where.status.in.includes(status) : status !== where.status.not;
+      if (allowed) status = data.status;
+      return { count: allowed ? 1 : 0 };
+    } };
+
+    const succeeded: Array<"MEITUAN" | "B_JIA"> = [];
+    const finishUpload = async (platform: "MEITUAN" | "B_JIA") => {
+      succeeded.push(platform); // this is the route's persisted-success count result
+      await updateCollectionUploadTaskStatus(task, "collection-1", succeeded.length === 2 ? "READY_TO_CONFIRM" : "DRAFT");
+    };
+
+    const slowMeituan = finishUpload("MEITUAN");
+    await draftReached; // paused after the MEITUAN success count and before its DRAFT write
+    await finishUpload("B_JIA"); // the actual upload-route helper establishes the ready pair
+    releaseDraft?.();
+    await slowMeituan;
+    expect(status).toBe("READY_TO_CONFIRM");
+
+    const db = database(status);
+    const response = await confirmCollection({ collection: collection(), user: bdUser, reviews: reviews(), database: db });
+    expect(response).toMatchObject({ ok: true, orderCount: 2 });
+    expect(db.state).toMatchObject({ status: "CONFIRMED" });
+    expect(db.state.orders).toHaveLength(2);
   });
 });

@@ -8,6 +8,7 @@ import { canMutateCollection } from "@/lib/permissions";
 import { saveScreenshotToCloudStorage } from "@/lib/cloudbase-storage";
 import { assertSupportedScreenshot, imageDataUrl } from "@/lib/storage";
 import { validateRecognition, validateRecognitionPlatform } from "@/lib/validation";
+import { updateCollectionUploadTaskStatus } from "@/lib/collection-upload-state";
 
 const platforms = new Set(["MEITUAN", "B_JIA"]);
 
@@ -42,14 +43,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ status: "DUPLICATE", error: "该截图已有采集记录，请更换截图", duplicateOf: duplicate ? { merchantName: duplicate.collection.merchantName, platform: duplicate.platform, uploadedAt: duplicate.collection.createdAt } : undefined }, { status: 409 });
   }
 
-  const updateTask = async (status: string) => {
-    const where = status === "DRAFT"
-      ? { id, status: { in: ["DRAFT", "UPLOADING", "RECOGNIZING"] } }
-      : { id, status: { not: "CONFIRMED" } };
-    const updated = await prisma.collectionTask.updateMany({ where, data: { status } });
-    if (status === "DRAFT" && updated.count === 0) return;
-    if (updated.count === 0) throw new Error("该采集任务已确认");
-  };
+  const updateTask = (status: string) => updateCollectionUploadTaskStatus(prisma.collectionTask, id, status);
 
   let uploadId: string | undefined;
   try {

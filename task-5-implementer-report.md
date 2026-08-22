@@ -45,3 +45,8 @@
 - Standardized duplicate audit time as `duplicateOf.uploadedAt`, matching the collection UI display contract; the regression test covers the safe merchant/platform/time payload.
 
 - Prevented a slower one-success upload from overwriting a concurrently established `READY_TO_CONFIRM` pair with `DRAFT`; only pre-ready states can now transition to `DRAFT`.
+
+## Race regression follow-up
+
+- Extracted the upload route's conditional task-state update into `collection-upload-state` and added a focused interleaving regression. It pauses the first MEITUAN completion after its persisted-success count and before `DRAFT`, lets B_JIA establish `READY_TO_CONFIRM`, then releases the first completion and verifies the persisted pair confirms exactly two orders and `CONFIRMED`.
+- Passed: `pnpm test tests/unit/collection-confirmation.test.ts tests/unit/order-calculations.test.ts tests/unit/storage.test.ts tests/unit/ocr.test.ts tests/unit/validation.test.ts tests/unit/d1-collection-migration.test.ts tests/unit/db-schema.test.ts` — 7 files and 29 tests passed.
