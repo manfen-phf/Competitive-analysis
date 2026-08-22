@@ -8,6 +8,7 @@ import sqlite3
 import sys
 
 root = sys.argv[1]
+mode = sys.argv[2]
 connection = sqlite3.connect(":memory:")
 for migration in ("0001_initial_schema.sql", "0002_d1_image_storage.sql", "0003_workspace_auth.sql"):
     with open(os.path.join(root, "migrations", migration), encoding="utf-8") as source:
@@ -33,7 +34,13 @@ VALUES ('failure-1', 'upload-failed', '无法识别', '2026-08-22 10:01:00');
 
 # Re-run the collection migration over historical data, as it will run in production.
 with open(os.path.join(root, "migrations", "0004_collection_task.sql"), encoding="utf-8") as source:
-    connection.executescript(source.read())
+    migration = source.read()
+
+connection.execute("PRAGMA foreign_keys = ON")
+if mode == "transaction":
+    connection.executescript("BEGIN;\\n" + migration + "\\nCOMMIT;")
+else:
+    connection.executescript(migration)
 
 success = connection.execute("""
 SELECT c.status, u.collectionId, u.platform, u.recognitionStatus, u.legacyImageData IS NOT NULL
@@ -52,17 +59,31 @@ print(json.dumps({
     "failed": failed,
     "orderNumberNotNull": order_number[3],
     "orderCount": connection.execute("SELECT COUNT(*) FROM OrderRecord").fetchone()[0],
+    "failureCount": connection.execute("SELECT COUNT(*) FROM RecognitionFailure").fetchone()[0],
+    "foreignKeyViolations": connection.execute("PRAGMA foreign_key_check").fetchall(),
 }))
 `;
 
+const expectedBackfill = {
+  success: ["CONFIRMED", "legacy-upload-success", "MEITUAN", "SUCCEEDED", 1],
+  failed: ["FAILED", null, "FAILED", 1],
+  orderNumberNotNull: 0,
+  orderCount: 1,
+  failureCount: 1,
+  foreignKeyViolations: [],
+};
+
+function runMigration(mode: "direct" | "transaction") {
+  const output = execFileSync("python", ["-c", migrationCheck, process.cwd(), mode], { encoding: "utf8" });
+  return JSON.parse(output);
+}
+
 describe("D1 collection-task migration", () => {
   it("backfills historical uploads and makes historical order numbers nullable", () => {
-    const output = execFileSync("python", ["-c", migrationCheck, process.cwd()], { encoding: "utf8" });
-    expect(JSON.parse(output)).toEqual({
-      success: ["CONFIRMED", "legacy-upload-success", "MEITUAN", "SUCCEEDED", 1],
-      failed: ["FAILED", null, "FAILED", 1],
-      orderNumberNotNull: 0,
-      orderCount: 1,
-    });
+    expect(runMigration("direct")).toEqual(expectedBackfill);
+  });
+
+  it("preserves child-table data and referential integrity with foreign keys active in a migration transaction", () => {
+    expect(runMigration("transaction")).toEqual(expectedBackfill);
   });
 });

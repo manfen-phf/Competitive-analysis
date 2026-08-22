@@ -1,6 +1,7 @@
 -- Paired collection tasks for Cloudflare D1 / SQLite.
--- Existing uploads are assigned one legacy task each before the new foreign key is enforced.
-PRAGMA foreign_keys=OFF;
+-- D1 migrations run inside a transaction and keep foreign-key enforcement enabled.
+-- Deferral is the D1-supported mechanism for the temporary schema changes below.
+PRAGMA defer_foreign_keys = on;
 
 CREATE TABLE "CollectionTask" (
     "id" TEXT NOT NULL PRIMARY KEY,
@@ -80,14 +81,8 @@ FROM "Upload" u
 LEFT JOIN "OrderRecord" o ON o."uploadId" = u."id"
 LEFT JOIN "RecognitionFailure" rf ON rf."uploadId" = u."id";
 
-DROP TABLE "Upload";
-ALTER TABLE "new_Upload" RENAME TO "Upload";
-CREATE UNIQUE INDEX "Upload_imageHash_key" ON "Upload"("imageHash");
-CREATE UNIQUE INDEX "Upload_imageAccessToken_key" ON "Upload"("imageAccessToken");
-CREATE INDEX "Upload_collectionId_platform_idx" ON "Upload"("collectionId", "platform");
-CREATE INDEX "Upload_recognitionStatus_idx" ON "Upload"("recognitionStatus");
-
--- SQLite requires rebuilding the table to make a NOT NULL column nullable.
+-- Upload has restrictive child tables, so rebuild and detach them before replacing Upload.
+-- The temporary child tables reference new_Upload, which SQLite rewrites to Upload on rename.
 CREATE TABLE "new_OrderRecord" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "uploadId" TEXT NOT NULL,
@@ -110,7 +105,7 @@ CREATE TABLE "new_OrderRecord" (
     "technicalServiceFee" REAL NOT NULL,
     "deliveryServiceFee" REAL NOT NULL,
     "merchantRate" REAL NOT NULL,
-    CONSTRAINT "OrderRecord_uploadId_fkey" FOREIGN KEY ("uploadId") REFERENCES "Upload" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    CONSTRAINT "OrderRecord_uploadId_fkey" FOREIGN KEY ("uploadId") REFERENCES "new_Upload" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 INSERT INTO "new_OrderRecord" (
@@ -126,10 +121,31 @@ SELECT
     "technicalServiceFee", "deliveryServiceFee", "merchantRate"
 FROM "OrderRecord";
 
+CREATE TABLE "new_RecognitionFailure" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "uploadId" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "RecognitionFailure_uploadId_fkey" FOREIGN KEY ("uploadId") REFERENCES "new_Upload" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+);
+
+INSERT INTO "new_RecognitionFailure" ("id", "uploadId", "reason", "createdAt")
+SELECT "id", "uploadId", "reason", "createdAt" FROM "RecognitionFailure";
+
 DROP TABLE "OrderRecord";
+DROP TABLE "RecognitionFailure";
+DROP TABLE "Upload";
+ALTER TABLE "new_Upload" RENAME TO "Upload";
 ALTER TABLE "new_OrderRecord" RENAME TO "OrderRecord";
+ALTER TABLE "new_RecognitionFailure" RENAME TO "RecognitionFailure";
+
+CREATE UNIQUE INDEX "Upload_imageHash_key" ON "Upload"("imageHash");
+CREATE UNIQUE INDEX "Upload_imageAccessToken_key" ON "Upload"("imageAccessToken");
+CREATE INDEX "Upload_collectionId_platform_idx" ON "Upload"("collectionId", "platform");
+CREATE INDEX "Upload_recognitionStatus_idx" ON "Upload"("recognitionStatus");
 CREATE UNIQUE INDEX "OrderRecord_uploadId_key" ON "OrderRecord"("uploadId");
 CREATE UNIQUE INDEX "OrderRecord_orderNumber_key" ON "OrderRecord"("orderNumber");
+CREATE UNIQUE INDEX "RecognitionFailure_uploadId_key" ON "RecognitionFailure"("uploadId");
 
 CREATE INDEX "CollectionTask_merchantId_createdAt_idx" ON "CollectionTask"("merchantId", "createdAt");
 CREATE INDEX "CollectionTask_city_bdName_status_idx" ON "CollectionTask"("city", "bdName", "status");
@@ -141,5 +157,3 @@ FOR EACH ROW WHEN NEW."updatedAt" = OLD."updatedAt"
 BEGIN
     UPDATE "CollectionTask" SET "updatedAt" = CURRENT_TIMESTAMP WHERE "id" = OLD."id";
 END;
-
-PRAGMA foreign_keys=ON;
