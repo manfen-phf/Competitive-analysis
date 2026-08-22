@@ -104,6 +104,7 @@ import {
   hasValidAccountScope,
   hashPassword,
   initializeAuthentication,
+  requireWorkspaceUser,
   verifyPassword,
 } from "@/lib/auth";
 
@@ -213,6 +214,18 @@ describe("account scope validation", () => {
     expect(hasValidAccountScope("BD", "玉林", "张三")).toBe(true);
     expect(hasValidAccountScope("BD", null, "张三")).toBe(false);
     expect(hasValidAccountScope("BD", "玉林", null)).toBe(false);
+  });
+});
+
+describe("workspace user guard", () => {
+  it("rejects a signed-in user whose role is outside the allowed set", async () => {
+    state.token = "browser-token";
+    state.session = {
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      user: { id: "user-1", username: "张三", role: "BD", city: "玉林", bdName: "张三" },
+    };
+
+    await expect(requireWorkspaceUser(["SUPER_ADMIN", "CITY_ADMIN"])).rejects.toThrow("Insufficient role");
   });
 });
 

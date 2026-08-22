@@ -61,7 +61,7 @@ export async function verifyPassword(password: string, passwordHash: string) {
   return timingSafeEqual(storedKey, derivedKey);
 }
 
-function sessionCookieOptions() {
+export function getSessionCookieOptions() {
   return {
     httpOnly: true,
     sameSite: "lax" as const,
@@ -81,7 +81,8 @@ export async function createSession(userId: string) {
   });
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, token, sessionCookieOptions());
+  cookieStore.set(SESSION_COOKIE_NAME, token, getSessionCookieOptions());
+  return token;
 }
 
 export async function clearSession() {
@@ -118,6 +119,25 @@ export async function getSession(): Promise<SessionUser | null> {
     city: session.user.city,
     bdName: session.user.bdName,
   };
+}
+
+export class AuthenticationRequiredError extends Error {
+  constructor() {
+    super("Authentication required");
+  }
+}
+
+export class AuthorizationError extends Error {
+  constructor() {
+    super("Insufficient role");
+  }
+}
+
+export async function requireWorkspaceUser(allowedRoles?: readonly AppRole[]): Promise<SessionUser> {
+  const user = await getSession();
+  if (!user) throw new AuthenticationRequiredError();
+  if (allowedRoles && !allowedRoles.includes(user.role)) throw new AuthorizationError();
+  return user;
 }
 
 export async function bootstrapFirstSuperAdmin(
