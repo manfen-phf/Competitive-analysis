@@ -5,28 +5,9 @@ import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
 
 import type { SessionUser } from "@/lib/auth";
+import { navItemsFor, type WorkspaceIconName } from "./navigation";
 
-export type WorkspaceIconName = "overview" | "collection" | "analysis" | "data" | "master-data" | "search" | "panel";
-
-export type WorkspaceNavItem = {
-  href: string;
-  label: string;
-  icon: Exclude<WorkspaceIconName, "search" | "panel">;
-};
-
-const allNavItems: WorkspaceNavItem[] = [
-  { href: "/", label: "概览", icon: "overview" },
-  { href: "/upload", label: "采集", icon: "collection" },
-  { href: "/dashboard", label: "分析", icon: "analysis" },
-  { href: "/health", label: "数据中心", icon: "data" },
-  { href: "/admin/import", label: "主数据", icon: "master-data" },
-];
-
-export function navItemsFor(user: Pick<SessionUser, "role">): WorkspaceNavItem[] {
-  if (user.role === "SUPER_ADMIN") return allNavItems;
-  if (user.role === "CITY_ADMIN") return allNavItems.slice(0, 4);
-  return allNavItems.slice(0, 3);
-}
+export { navItemsFor, type WorkspaceIconName, type WorkspaceNavItem } from "./navigation";
 
 type WorkspaceRailProps = {
   user: SessionUser;
@@ -49,7 +30,7 @@ export function WorkspaceRail({ user, expanded, onToggle, onCommand }: Workspace
         <WorkspaceIcon name="panel" />
       </button>
     </div>
-    <button className="workspace-rail-command workspace-control" type="button" onClick={onCommand}>
+    <button className="workspace-rail-command workspace-control" type="button" onClick={onCommand} aria-label="搜索与命令">
       <WorkspaceIcon name="search" />
       {expanded ? <span>搜索与命令</span> : null}
       {expanded ? <kbd>⌘K</kbd> : null}
@@ -73,6 +54,7 @@ export function WorkspaceIcon({ name }: { name: WorkspaceIconName }) {
     analysis: <><path d="M4 19V5M4 19h16" /><path d="m7 15 3-4 3 2 5-6" /></>,
     data: <><path d="M4 10h16v10H4zM3 6h18l-2 4H5zM8 20v-6h4v6" /></>,
     "master-data": <><circle cx="12" cy="8" r="3.5" /><path d="M4.5 20c.7-3.4 3.2-5.5 7.5-5.5s6.8 2.1 7.5 5.5" /></>,
+    account: <><circle cx="12" cy="8" r="3.5" /><path d="M4.5 20c.7-3.4 3.2-5.5 7.5-5.5s6.8 2.1 7.5 5.5" /></>,
     search: <><circle cx="10.5" cy="10.5" r="6" /><path d="m15 15 5 5" /></>,
     panel: <><rect x="4" y="4" width="16" height="16" rx="3" /><path d="M10 4v16" /></>,
   };

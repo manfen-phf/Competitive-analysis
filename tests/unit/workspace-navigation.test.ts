@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { navItemsFor } from "@/components/workspace/workspace-rail";
+import { mobileNavItemsFor } from "@/components/workspace/mobile-navigation";
 import type { SessionUser } from "@/lib/auth";
 
 function user(role: SessionUser["role"]): SessionUser {
@@ -12,11 +13,24 @@ describe("workspace navigation", () => {
     expect(navItemsFor(user("BD")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard"]);
   });
 
+  it("uses the role-aware overview destinations for a BD", () => {
+    expect(navItemsFor(user("BD")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard"]);
+  });
+
   it("gives a city administrator the data center but not master data", () => {
     expect(navItemsFor(user("CITY_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health"]);
   });
 
   it("gives a super administrator every workspace destination", () => {
     expect(navItemsFor(user("SUPER_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health", "/admin/import"]);
+  });
+
+  it("keeps BD mobile navigation to collection destinations and my account", () => {
+    expect(mobileNavItemsFor(user("BD")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/account"]);
+  });
+
+  it("uses data center and my account as the two role-aware admin mobile destinations", () => {
+    expect(mobileNavItemsFor(user("CITY_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health", "/account"]);
+    expect(mobileNavItemsFor(user("SUPER_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health", "/account"]);
   });
 });
