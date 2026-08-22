@@ -38,8 +38,8 @@ export type CollectionReviewInput = {
 };
 
 type Transaction = {
-  orderRecord: { create: (input: { data: Record<string, unknown> }) => Promise<unknown> };
-  collectionTask: { updateMany: (input: { where: { id: string; status: string }; data: { status: string } }) => Promise<{ count: number }> };
+  orderRecord: { create: (input: { data: Record<string, unknown> }) => Promise<unknown>; count: (input: { where: { upload: { collectionId: string } } }) => Promise<number> };
+  collectionTask: { updateMany: (input: { where: { id: string; status: string }; data: { status: string } }) => Promise<{ count: number}>; findUnique: (input: { where: { id: string }; select: { status: true } }) => Promise<{ status: string } | null> };
 };
 
 export type ConfirmationDatabase = {
@@ -168,10 +168,15 @@ export async function confirmCollection({ collection, user, reviews, database }:
     const orders = [toOrderData(collection, meituanUpload, meituanReview), toOrderData(collection, bJiaUpload, bJiaReview)];
     const result = await database.$transaction(async (transaction) => {
       const transition = await transaction.collectionTask.updateMany({ where: { id: collection.id, status: "READY_TO_CONFIRM" }, data: { status: "CONFIRMED" } });
-      if (transition.count === 0) return { alreadyConfirmed: true as const };
+      if (transition.count === 0) {
+        const [persisted, orderCount] = await Promise.all([transaction.collectionTask.findUnique({ where: { id: collection.id }, select: { status: true } }), transaction.orderRecord.count({ where: { upload: { collectionId: collection.id } } })]);
+        if (persisted?.status === "CONFIRMED" && orderCount === 2) return { alreadyConfirmed: true as const };
+        return { conflict: true as const };
+      }
       await Promise.all(orders.map((data) => transaction.orderRecord.create({ data })));
       return { alreadyConfirmed: false as const };
     });
+    if (result.conflict) return { ok: false as const, error: "采集任务当前不可确认" };
     return { ok: true as const, orderCount: orders.length, ...(result.alreadyConfirmed ? { alreadyConfirmed: true as const } : {}) };
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "确认入库失败" };

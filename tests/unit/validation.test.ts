@@ -3,7 +3,7 @@ import { validateRecognition } from "../../src/lib/validation";
 
 const validPayload = {
   platform: "MEITUAN", orderNumber: "A-001", dishPrice: 50, packagingFee: 2,
-  platformRedPacket: 5, originalDeliveryFee: 6, deliveryFeeReduction: 2,
+  platformRedPacket: 5, platformRedPacketMerchantShare: 1, originalDeliveryFee: 6, deliveryFeeReduction: 2,
   paidDeliveryFee: 4, merchantSettlementAmount: 35, userPaidAmount: 51,
   otherPromotion: 0, technicalServiceFee: 3, deliveryServiceFee: 4,
   merchantRate: 0.06, confidence: 0.95,
@@ -16,6 +16,11 @@ describe("validateRecognition", () => {
 
   it("rejects a missing mandatory field", () => {
     expect(validateRecognition({ ...validPayload, userPaidAmount: null }).ok).toBe(false);
+  });
+
+  it("rejects a missing platform red-packet merchant share", () => {
+    const { platformRedPacketMerchantShare: _missing, ...payload } = validPayload;
+    expect(validateRecognition(payload).ok).toBe(false);
   });
 
   it("accepts recognition without an order number", () => {

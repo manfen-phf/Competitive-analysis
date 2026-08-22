@@ -26,6 +26,7 @@ vi.mock("@/lib/db", () => ({
       findFirst: async () => routeState.existingUpload,
       create: async ({ data }: { data: Record<string, unknown> }) => { routeState.uploaded = data; return { id: "upload-new", ...data }; },
     },
+    imageHashReservation: { create: async () => { if (routeState.existingUpload) throw new Error("duplicate"); }, delete: async () => undefined },
   }),
 }));
 
@@ -55,8 +56,8 @@ function reviews() {
 function database() {
   const state = { orders: [] as Record<string, unknown>[], status: "READY_TO_CONFIRM" };
   const tx = {
-    orderRecord: { create: async ({ data }: { data: Record<string, unknown> }) => { state.orders.push(data); return data; } },
-    collectionTask: { updateMany: async ({ data }: { data: { status: string } }) => { state.status = data.status; return { count: 1 }; } },
+    orderRecord: { create: async ({ data }: { data: Record<string, unknown> }) => { state.orders.push(data); return data; }, count: async () => state.orders.length },
+    collectionTask: { updateMany: async ({ data }: { data: { status: string } }) => { state.status = data.status; return { count: 1 }; }, findUnique: async () => ({ status: state.status }) },
   };
   return { state, $transaction: async <T>(callback: (transaction: typeof tx) => Promise<T>) => callback(tx) };
 }

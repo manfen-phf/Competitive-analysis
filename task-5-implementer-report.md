@@ -29,3 +29,9 @@
 - Added `platformRedPacketMerchantShare` to OCR extraction/validation, editable review state/UI, confirmation records, Prisma schema, and D1 migration `0006_order_red_packet_merchant_share.sql`.
 - Confirmation returns a stable successful result for an already-confirmed task. A conditional `READY_TO_CONFIRM → CONFIRMED` update is executed inside the transaction before order creation, preventing repeated/concurrent creation; order records now retain each screenshot's original upload timestamp.
 - Added regression assertions for safe duplicate rejection, OCR platform mismatch validation, idempotent confirmation, red-packet merchant share, and preserved upload timestamps.
+
+## Final review follow-up
+
+- Added a D1-compatible `ImageHashReservation` primary-key table. The route atomically reserves the SHA-256 hash before storage, so parallel same-hash attempts receive the same safe duplicate rejection and cannot expose an image capability.
+- A zero-row confirmation transition now verifies persisted `CONFIRMED` status and exactly two collection orders before returning idempotent success; all other states return a conflict. Upload readiness is recalculated from persisted successful uploads rather than a stale request snapshot.
+- Updated the shared validation fixture and added a regression test for missing `platformRedPacketMerchantShare`.
