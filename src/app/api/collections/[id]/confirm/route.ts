@@ -17,7 +17,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   const prisma = await getPrisma();
   const collection = await prisma.collectionTask.findUnique({
     where: { id },
-    include: { uploads: { select: { id: true, platform: true, recognitionStatus: true, recognitionResult: true } } },
+    include: { uploads: { select: { id: true, platform: true, recognitionStatus: true, recognitionResult: true, uploadedAt: true } } },
   });
   if (!collection) return NextResponse.json({ error: "采集任务不存在" }, { status: 404 });
 

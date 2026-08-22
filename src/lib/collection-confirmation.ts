@@ -8,6 +8,7 @@ type ConfirmableUpload = {
   platform: string | null;
   recognitionStatus: string;
   recognitionResult: string | null;
+  uploadedAt: Date;
 };
 
 export type ConfirmableCollection = {
@@ -29,6 +30,7 @@ export type CollectionReviewInput = {
   otherPromotion?: number | null;
   deliveryFeeReduction?: number | null;
   platformRedPacket?: number | null;
+  platformRedPacketMerchantShare?: number | null;
   merchantSettlementAmount?: number | null;
   technicalServiceFee?: number | null;
   deliveryServiceFee?: number | null;
@@ -37,7 +39,7 @@ export type CollectionReviewInput = {
 
 type Transaction = {
   orderRecord: { create: (input: { data: Record<string, unknown> }) => Promise<unknown> };
-  collectionTask: { update: (input: { where: { id: string }; data: { status: string } }) => Promise<unknown> };
+  collectionTask: { updateMany: (input: { where: { id: string; status: string }; data: { status: string } }) => Promise<{ count: number }> };
 };
 
 export type ConfirmationDatabase = {
@@ -93,6 +95,7 @@ function toOrderData(collection: ConfirmableCollection, upload: ConfirmableUploa
   const otherPromotion = amount(review.otherPromotion, "其他活动");
   const deliveryFeeReduction = amount(review.deliveryFeeReduction, "减配送费");
   const platformRedPacket = amount(review.platformRedPacket, "平台红包抵扣金额");
+  const platformRedPacketMerchantShare = amount(review.platformRedPacketMerchantShare, "平台红包商家承担");
   const merchantSettlementAmount = amount(review.merchantSettlementAmount, "结算金额", true);
   const technicalServiceFee = amount(review.technicalServiceFee, "技术服务费");
   const deliveryServiceFee = amount(review.deliveryServiceFee, "配送服务费");
@@ -108,6 +111,7 @@ function toOrderData(collection: ConfirmableCollection, upload: ConfirmableUploa
 
   return {
     uploadId: upload.id,
+    uploadedAt: upload.uploadedAt,
     orderNumber: review.orderNumber?.trim() || null,
     platform: review.platform,
     merchantId: collection.merchantId,
@@ -117,6 +121,7 @@ function toOrderData(collection: ConfirmableCollection, upload: ConfirmableUploa
     dishPrice: derived.dishPrice,
     packagingFee,
     platformRedPacket,
+    platformRedPacketMerchantShare,
     originalDeliveryFee: collection.originalDeliveryFee,
     deliveryFeeReduction,
     paidDeliveryFee: derived.paidDeliveryFee,
@@ -131,7 +136,7 @@ function toOrderData(collection: ConfirmableCollection, upload: ConfirmableUploa
 
 export async function confirmCollection({ collection, user, reviews, database }: ConfirmCollectionInput) {
   if (!canMutateCollection(user, collection)) return { ok: false as const, error: "无权操作此采集任务" };
-  if (collection.status === "CONFIRMED") return { ok: false as const, error: "该采集任务已确认" };
+  if (collection.status === "CONFIRMED") return { ok: true as const, orderCount: 2, alreadyConfirmed: true as const };
 
   const draft = {
     merchantId: collection.merchantId,
@@ -161,11 +166,13 @@ export async function confirmCollection({ collection, user, reviews, database }:
 
   try {
     const orders = [toOrderData(collection, meituanUpload, meituanReview), toOrderData(collection, bJiaUpload, bJiaReview)];
-    await database.$transaction(async (transaction) => {
+    const result = await database.$transaction(async (transaction) => {
+      const transition = await transaction.collectionTask.updateMany({ where: { id: collection.id, status: "READY_TO_CONFIRM" }, data: { status: "CONFIRMED" } });
+      if (transition.count === 0) return { alreadyConfirmed: true as const };
       await Promise.all(orders.map((data) => transaction.orderRecord.create({ data })));
-      await transaction.collectionTask.update({ where: { id: collection.id }, data: { status: "CONFIRMED" } });
+      return { alreadyConfirmed: false as const };
     });
-    return { ok: true as const, orderCount: orders.length };
+    return { ok: true as const, orderCount: orders.length, ...(result.alreadyConfirmed ? { alreadyConfirmed: true as const } : {}) };
   } catch (error) {
     return { ok: false as const, error: error instanceof Error ? error.message : "确认入库失败" };
   }

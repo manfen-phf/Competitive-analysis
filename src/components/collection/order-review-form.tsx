@@ -12,7 +12,7 @@ type OrderReviewFormProps = {
 };
 
 const editableFields: Array<{ field: keyof CollectionReviewInput; label: string }> = [
-  { field: "goodsTotal", label: "商品总价" }, { field: "packagingFee", label: "打包费" }, { field: "merchantActivity", label: "商家活动款" }, { field: "otherPromotion", label: "其他活动" }, { field: "deliveryFeeReduction", label: "减配送费" }, { field: "platformRedPacket", label: "平台红包抵扣金额" }, { field: "merchantSettlementAmount", label: "结算金额" }, { field: "technicalServiceFee", label: "技术服务费" }, { field: "deliveryServiceFee", label: "配送服务费" },
+  { field: "goodsTotal", label: "商品总价" }, { field: "packagingFee", label: "打包费" }, { field: "merchantActivity", label: "商家活动款" }, { field: "otherPromotion", label: "其他活动" }, { field: "deliveryFeeReduction", label: "减配送费" }, { field: "platformRedPacket", label: "平台红包抵扣金额" }, { field: "platformRedPacketMerchantShare", label: "平台红包商家承担" }, { field: "merchantSettlementAmount", label: "结算金额" }, { field: "technicalServiceFee", label: "技术服务费" }, { field: "deliveryServiceFee", label: "配送服务费" },
 ];
 
 const platformLabel: Record<UploadPlatform, string> = { MEITUAN: "美团", B_JIA: "B家" };

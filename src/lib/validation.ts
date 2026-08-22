@@ -3,7 +3,7 @@ import { z } from "zod";
 const money = z.number().finite().nonnegative();
 export const recognitionSchema = z.object({
   platform: z.enum(["MEITUAN", "B_JIA"]), orderNumber: z.string().trim().min(1).optional(),
-  dishPrice: money, packagingFee: money, platformRedPacket: money, originalDeliveryFee: money,
+  dishPrice: money, packagingFee: money, platformRedPacket: money, platformRedPacketMerchantShare: money, originalDeliveryFee: money,
   deliveryFeeReduction: money, paidDeliveryFee: money, merchantSettlementAmount: z.number().finite(),
   userPaidAmount: money, otherPromotion: money, technicalServiceFee: money, deliveryServiceFee: money,
   merchantRate: money, confidence: z.number().min(0).max(1),
@@ -18,4 +18,10 @@ export function validateRecognition(payload: unknown): { ok: boolean; reason?: s
   const expectedPaidDeliveryFee = Math.max(data.originalDeliveryFee - data.deliveryFeeReduction, 0);
   if (Math.abs(expectedPaidDeliveryFee - data.paidDeliveryFee) > 0.02) return { ok: false, reason: "配送费金额关系不一致" };
   return { ok: true };
+}
+
+export function validateRecognitionPlatform(requestedPlatform: "MEITUAN" | "B_JIA", recognizedPlatform: string) {
+  return requestedPlatform === recognizedPlatform
+    ? { ok: true as const }
+    : { ok: false as const, reason: "截图识别平台与所选平台不一致" };
 }

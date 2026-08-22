@@ -21,7 +21,7 @@ function reviewFromRecognition(platform: UploadPlatform, recognition: Record<str
   return {
     platform,
     goodsTotal: number("dishPrice") + number("packagingFee"),
-    packagingFee: number("packagingFee"), merchantActivity: 0, otherPromotion: number("otherPromotion"), deliveryFeeReduction: number("deliveryFeeReduction"), platformRedPacket: number("platformRedPacket"), merchantSettlementAmount: number("merchantSettlementAmount"), technicalServiceFee: number("technicalServiceFee"), deliveryServiceFee: number("deliveryServiceFee"), orderNumber: typeof recognition.orderNumber === "string" ? recognition.orderNumber : "",
+    packagingFee: number("packagingFee"), merchantActivity: 0, otherPromotion: number("otherPromotion"), deliveryFeeReduction: number("deliveryFeeReduction"), platformRedPacket: number("platformRedPacket"), platformRedPacketMerchantShare: number("platformRedPacketMerchantShare"), merchantSettlementAmount: number("merchantSettlementAmount"), technicalServiceFee: number("technicalServiceFee"), deliveryServiceFee: number("deliveryServiceFee"), orderNumber: typeof recognition.orderNumber === "string" ? recognition.orderNumber : "",
   };
 }
 

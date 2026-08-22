@@ -21,3 +21,11 @@
 - No deployment was run.
 - Browser visual QA was intentionally not used as a completion gate for this implementation pass; backend services require configured runtime credentials. The UI is covered by the responsive implementation and type/test checks above, but real CloudBase/OCR end-to-end verification remains required in a configured environment.
 - Existing unrelated working-tree changes were left unstaged.
+
+## Review follow-up
+
+- Duplicate requests now return only `DUPLICATE` audit metadata and never create an upload, copy a storage file ID, mint an image token, or return a bearer capability. Image retrieval additionally requires an authenticated user with collection scope.
+- OCR platform is compared to the explicit requested platform; a mismatch follows the persisted recognition-failure path with the actionable mismatch reason.
+- Added `platformRedPacketMerchantShare` to OCR extraction/validation, editable review state/UI, confirmation records, Prisma schema, and D1 migration `0006_order_red_packet_merchant_share.sql`.
+- Confirmation returns a stable successful result for an already-confirmed task. A conditional `READY_TO_CONFIRM → CONFIRMED` update is executed inside the transaction before order creation, preventing repeated/concurrent creation; order records now retain each screenshot's original upload timestamp.
+- Added regression assertions for safe duplicate rejection, OCR platform mismatch validation, idempotent confirmation, red-packet merchant share, and preserved upload timestamps.

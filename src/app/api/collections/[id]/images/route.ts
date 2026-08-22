@@ -1,4 +1,3 @@
-import { randomUUID } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
@@ -8,7 +7,7 @@ import { recognizeOrderScreenshot } from "@/lib/ocr";
 import { canMutateCollection } from "@/lib/permissions";
 import { saveScreenshotToCloudStorage } from "@/lib/cloudbase-storage";
 import { assertSupportedScreenshot, imageDataUrl } from "@/lib/storage";
-import { validateRecognition } from "@/lib/validation";
+import { validateRecognition, validateRecognitionPlatform } from "@/lib/validation";
 
 const platforms = new Set(["MEITUAN", "B_JIA"]);
 
@@ -42,21 +41,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     include: { collection: { select: { merchantName: true } } },
   });
   if (existing) {
-    const duplicate = await prisma.upload.create({
-      data: {
-        collectionId: id,
-        platform,
-        recognitionStatus: "DUPLICATE",
-        imageFileId: existing.imageFileId,
-        imageMimeType: existing.imageMimeType,
-        imageHash: hash,
-        imageAccessToken: randomUUID(),
-        storageReference: existing.storageReference ?? existing.imageFileId,
-      },
-    });
     return NextResponse.json({
       status: "DUPLICATE",
-      upload: duplicate,
       duplicateOf: { merchantName: existing.collection.merchantName, platform: existing.platform, uploadedAt: existing.uploadedAt },
     }, { status: 409 });
   }
@@ -65,6 +51,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   try {
     await prisma.collectionTask.update({ where: { id }, data: { status: "UPLOADING" } });
     const imageFileId = await saveScreenshotToCloudStorage(bytes, file.type, hash);
+    const { randomUUID } = await import("node:crypto");
     const upload = await prisma.upload.create({
       data: { collectionId: id, platform, recognitionStatus: "PROCESSING", imageFileId, imageMimeType: file.type, imageHash: hash, imageAccessToken: randomUUID(), storageReference: imageFileId },
     });
@@ -73,6 +60,8 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     const recognition = await recognizeOrderScreenshot(imageDataUrl(bytes, file.type));
     const validation = validateRecognition(recognition);
     if (!validation.ok) throw new Error(validation.reason);
+    const platformValidation = validateRecognitionPlatform(platform as "MEITUAN" | "B_JIA", recognition.platform);
+    if (!platformValidation.ok) throw new Error(platformValidation.reason);
     await prisma.upload.update({ where: { id: upload.id }, data: { recognitionStatus: "SUCCEEDED", recognitionResult: JSON.stringify(recognition) } });
 
     const ready = (["MEITUAN", "B_JIA"] as const).every((candidate) => candidate === platform || collection.uploads.some((image) => image.platform === candidate && image.recognitionStatus === "SUCCEEDED"));

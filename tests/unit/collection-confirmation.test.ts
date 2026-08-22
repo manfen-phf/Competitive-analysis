@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 
 import { confirmCollection } from "@/lib/collection-confirmation";
 import { canMutateCollection } from "@/lib/permissions";
+import { validateRecognitionPlatform } from "@/lib/validation";
 
 const routeState = vi.hoisted(() => ({
   user: null as null | { id: string; username: string; role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD"; city: string | null; bdName: string | null },
@@ -36,8 +37,8 @@ import { GET as listMerchants } from "@/app/api/merchants/route";
 const bdUser = { id: "bd-1", username: "张三", role: "BD" as const, city: "玉林", bdName: "张三" };
 
 function collection(images = [
-  { id: "image-mt", platform: "MEITUAN", recognitionStatus: "SUCCEEDED", recognitionResult: JSON.stringify({ dishPrice: 20, packagingFee: 2 }) },
-  { id: "image-bj", platform: "B_JIA", recognitionStatus: "SUCCEEDED", recognitionResult: JSON.stringify({ dishPrice: 30, packagingFee: 0 }) },
+  { id: "image-mt", platform: "MEITUAN", recognitionStatus: "SUCCEEDED", uploadedAt: new Date("2026-08-22T08:00:00Z"), recognitionResult: JSON.stringify({ dishPrice: 20, packagingFee: 2 }) },
+  { id: "image-bj", platform: "B_JIA", recognitionStatus: "SUCCEEDED", uploadedAt: new Date("2026-08-22T08:01:00Z"), recognitionResult: JSON.stringify({ dishPrice: 30, packagingFee: 0 }) },
 ]) {
   return {
     id: "collection-1", merchantId: "merchant-1", merchantName: "茶百道", city: "玉林", bdName: "张三", originalDeliveryFee: 5, status: "READY_TO_CONFIRM", uploads: images,
@@ -55,7 +56,7 @@ function database() {
   const state = { orders: [] as Record<string, unknown>[], status: "READY_TO_CONFIRM" };
   const tx = {
     orderRecord: { create: async ({ data }: { data: Record<string, unknown> }) => { state.orders.push(data); return data; } },
-    collectionTask: { update: async ({ data }: { data: { status: string } }) => { state.status = data.status; return { status: data.status }; } },
+    collectionTask: { updateMany: async ({ data }: { data: { status: string } }) => { state.status = data.status; return { count: 1 }; } },
   };
   return { state, $transaction: async <T>(callback: (transaction: typeof tx) => Promise<T>) => callback(tx) };
 }
@@ -115,18 +116,29 @@ describe("paired collection confirmation", () => {
     const response = await uploadCollectionImage(new Request("http://test/api/collections/collection-1/images", { method: "POST", body: form }) as never, { params: Promise.resolve({ id: "collection-1" }) });
 
     expect(response.status).toBe(409);
-    expect(routeState.uploaded).toMatchObject({ collectionId: "collection-1", platform: "MEITUAN", recognitionStatus: "DUPLICATE", imageFileId: "cloud://image" });
+    expect(routeState.uploaded).toBeUndefined();
   });
 
   it("rejects confirmation unless both platform images are recognized", async () => {
     const response = await confirmCollection({
-      collection: collection([{ id: "image-mt", platform: "MEITUAN", recognitionStatus: "SUCCEEDED", recognitionResult: JSON.stringify({ dishPrice: 20, packagingFee: 2 }) }]),
+      collection: collection([{ id: "image-mt", platform: "MEITUAN", recognitionStatus: "SUCCEEDED", uploadedAt: new Date("2026-08-22T08:00:00Z"), recognitionResult: JSON.stringify({ dishPrice: 20, packagingFee: 2 }) }]),
       user: bdUser,
       reviews: reviews(),
       database: database(),
     });
 
     expect(response).toMatchObject({ ok: false, error: "请先完成美团和B家两张截图的识别" });
+  });
+
+  it("rejects an OCR result labelled as the other platform", () => {
+    expect(validateRecognitionPlatform("MEITUAN", "B_JIA")).toEqual({ ok: false, reason: "截图识别平台与所选平台不一致" });
+  });
+
+  it("returns a stable success for a repeated confirmed collection", async () => {
+    const db = database();
+    const response = await confirmCollection({ collection: { ...collection(), status: "CONFIRMED" }, user: bdUser, reviews: reviews(), database: db });
+    expect(response).toMatchObject({ ok: true, orderCount: 2, alreadyConfirmed: true });
+    expect(db.state.orders).toHaveLength(0);
   });
 
   it("rejects a BD editing another BD collection", async () => {
@@ -143,8 +155,8 @@ describe("paired collection confirmation", () => {
     expect(response).toMatchObject({ ok: true, orderCount: 2 });
     expect(db.state.status).toBe("CONFIRMED");
     expect(db.state.orders).toEqual(expect.arrayContaining([
-      expect.objectContaining({ platform: "MEITUAN", uploadId: "image-mt", dishPrice: 20, paidDeliveryFee: 0, userPaidAmount: 22, merchantRate: 2 / 22 }),
-      expect.objectContaining({ platform: "B_JIA", uploadId: "image-bj", dishPrice: 30, paidDeliveryFee: 4, userPaidAmount: 33, merchantRate: 0.1 }),
+      expect.objectContaining({ platform: "MEITUAN", uploadId: "image-mt", uploadedAt: new Date("2026-08-22T08:00:00Z"), platformRedPacketMerchantShare: 0, dishPrice: 20, paidDeliveryFee: 0, userPaidAmount: 22, merchantRate: 2 / 22 }),
+      expect.objectContaining({ platform: "B_JIA", uploadId: "image-bj", uploadedAt: new Date("2026-08-22T08:01:00Z"), platformRedPacketMerchantShare: 0, dishPrice: 30, paidDeliveryFee: 4, userPaidAmount: 33, merchantRate: 0.1 }),
     ]));
   });
 });

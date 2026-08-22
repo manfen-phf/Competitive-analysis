@@ -1,7 +1,7 @@
 import { recognitionSchema, type RecognitionResult } from "@/lib/validation";
 import { getRuntimeSecret } from "@/lib/runtime-secrets";
 
-const extractionPrompt = `你是外卖订单结算截图的数据抽取器。只输出一个 JSON 对象，不要 Markdown，不要解释。字段必须全部存在：platform（MEITUAN 或 B_JIA）、orderNumber、dishPrice、packagingFee、platformRedPacket、originalDeliveryFee、deliveryFeeReduction、paidDeliveryFee、merchantSettlementAmount、userPaidAmount、otherPromotion、technicalServiceFee、deliveryServiceFee、merchantRate、confidence。所有金额均为非负数字；merchantRate 用百分比数字表示（如 7.6），confidence 为 0 到 1。无法确定任何字段时仍输出 JSON，但将 confidence 设为 0。`;
+const extractionPrompt = `你是外卖订单结算截图的数据抽取器。只输出一个 JSON 对象，不要 Markdown，不要解释。字段必须全部存在：platform（MEITUAN 或 B_JIA）、orderNumber、dishPrice、packagingFee、platformRedPacket、platformRedPacketMerchantShare、originalDeliveryFee、deliveryFeeReduction、paidDeliveryFee、merchantSettlementAmount、userPaidAmount、otherPromotion、technicalServiceFee、deliveryServiceFee、merchantRate、confidence。所有金额均为非负数字；merchantRate 用百分比数字表示（如 7.6），confidence 为 0 到 1。无法确定任何字段时仍输出 JSON，但将 confidence 设为 0。`;
 
 export function extractJsonContent(content: string): unknown {
   const normalized = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");

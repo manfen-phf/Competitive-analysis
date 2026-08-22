@@ -120,6 +120,7 @@ model OrderRecord {
   dishPrice Float
   packagingFee Float
   platformRedPacket Float
+  platformRedPacketMerchantShare Float @default(0)
   originalDeliveryFee Float
   deliveryFeeReduction Float
   paidDeliveryFee Float
