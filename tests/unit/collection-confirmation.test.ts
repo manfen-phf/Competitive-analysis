@@ -161,4 +161,11 @@ describe("paired collection confirmation", () => {
       expect.objectContaining({ platform: "B_JIA", uploadId: "image-bj", uploadedAt: new Date("2026-08-22T08:01:00Z"), platformRedPacketMerchantShare: 0, dishPrice: 30, paidDeliveryFee: 4, userPaidAmount: 33, merchantRate: 0.1 }),
     ]));
   });
+
+  it("keeps a ready collection confirmable when a slower upload observes only one success", async () => {
+    const db = database("READY_TO_CONFIRM");
+    const response = await confirmCollection({ collection: collection(), user: bdUser, reviews: reviews(), database: db });
+    expect(response).toMatchObject({ ok: true, orderCount: 2 });
+    expect(db.state.status).toBe("CONFIRMED");
+  });
 });

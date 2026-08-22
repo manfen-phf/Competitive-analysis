@@ -43,7 +43,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   }
 
   const updateTask = async (status: string) => {
-    const updated = await prisma.collectionTask.updateMany({ where: { id, status: { not: "CONFIRMED" } }, data: { status } });
+    const where = status === "DRAFT"
+      ? { id, status: { in: ["DRAFT", "UPLOADING", "RECOGNIZING"] } }
+      : { id, status: { not: "CONFIRMED" } };
+    const updated = await prisma.collectionTask.updateMany({ where, data: { status } });
+    if (status === "DRAFT" && updated.count === 0) return;
     if (updated.count === 0) throw new Error("该采集任务已确认");
   };
 

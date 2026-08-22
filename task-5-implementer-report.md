@@ -43,3 +43,5 @@
 - Expanded D1 migration regression through migrations 0001–0007, including the new column/table and a duplicate reservation uniqueness check. Duplicate responses now include only safe merchant/platform/collection-time metadata.
 
 - Standardized duplicate audit time as `duplicateOf.uploadedAt`, matching the collection UI display contract; the regression test covers the safe merchant/platform/time payload.
+
+- Prevented a slower one-success upload from overwriting a concurrently established `READY_TO_CONFIRM` pair with `DRAFT`; only pre-ready states can now transition to `DRAFT`.
