@@ -3,8 +3,13 @@ import * as XLSX from "xlsx";
 import { getPrisma } from "@/lib/db";
 import { parseMasterDataRows } from "@/lib/master-data";
 import { getRuntimeSecret } from "@/lib/runtime-secrets";
+import { getSession } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (user.role !== "SUPER_ADMIN") return NextResponse.json({ error: "无权导入主数据" }, { status: 403 });
+
   const prisma = await getPrisma();
   const form = await request.formData();
   const passcode = await getRuntimeSecret("ADMIN_IMPORT_PASSCODE");

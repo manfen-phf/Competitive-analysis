@@ -52,9 +52,15 @@ vi.mock("@/lib/auth", () => ({
   SESSION_COOKIE_NAME: "competition_session",
 }));
 
+vi.mock("@/lib/runtime-secrets", () => ({
+  getRuntimeSecret: async () => "valid-passcode",
+}));
+
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as createUser } from "@/app/api/admin/users/route";
+import { POST as importMasterData } from "@/app/api/admin/master-data/route";
+import { safeNextPath } from "@/app/login/page";
 
 beforeEach(() => {
   state.user = {
@@ -103,6 +109,15 @@ describe("login route", () => {
   });
 });
 
+describe("login return path", () => {
+  it("rejects encoded backslash and protocol-relative paths", () => {
+    expect(safeNextPath("/%5Cevil.example")).toBe("/");
+    expect(safeNextPath("/%5C%5Cevil.example")).toBe("/");
+    expect(safeNextPath("//evil.example")).toBe("/");
+    expect(safeNextPath("/dashboard?city=%E7%8E%89%E6%9E%97")).toBe("/dashboard?city=%E7%8E%89%E6%9E%97");
+  });
+});
+
 describe("account creation route", () => {
   it("rejects a disabled role value", async () => {
     state.sessionUser = { id: "admin-1", username: "admin", role: "SUPER_ADMIN", city: null, bdName: null };
@@ -126,5 +141,37 @@ describe("account creation route", () => {
 
     expect(response.status).toBe(400);
     expect(state.createdUser).toBeUndefined();
+  });
+});
+
+describe("master-data import route", () => {
+  function importRequest() {
+    const form = new FormData();
+    form.set("passcode", "valid-passcode");
+    return new Request("http://test/api/admin/master-data", { method: "POST", body: form }) as never;
+  }
+
+  it("rejects an anonymous caller even with the legacy passcode", async () => {
+    state.sessionUser = null;
+
+    const response = await importMasterData(importRequest());
+
+    expect(response.status).toBe(401);
+  });
+
+  it("rejects a BD caller even with the legacy passcode", async () => {
+    state.sessionUser = { id: "user-1", username: "张三", role: "BD", city: "玉林", bdName: "张三" };
+
+    const response = await importMasterData(importRequest());
+
+    expect(response.status).toBe(403);
+  });
+
+  it("allows a super administrator to reach the existing import validation", async () => {
+    state.sessionUser = { id: "admin-1", username: "admin", role: "SUPER_ADMIN", city: null, bdName: null };
+
+    const response = await importMasterData(importRequest());
+
+    expect(response.status).toBe(400);
   });
 });
