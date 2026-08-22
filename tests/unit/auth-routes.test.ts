@@ -60,7 +60,7 @@ import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
 import { POST as createUser } from "@/app/api/admin/users/route";
 import { POST as importMasterData } from "@/app/api/admin/master-data/route";
-import { safeNextPath } from "@/app/login/page";
+import { safeNextPath } from "@/lib/auth-navigation";
 
 beforeEach(() => {
   state.user = {
