@@ -35,3 +35,9 @@
 - Added a D1-compatible `ImageHashReservation` primary-key table. The route atomically reserves the SHA-256 hash before storage, so parallel same-hash attempts receive the same safe duplicate rejection and cannot expose an image capability.
 - A zero-row confirmation transition now verifies persisted `CONFIRMED` status and exactly two collection orders before returning idempotent success; all other states return a conflict. Upload readiness is recalculated from persisted successful uploads rather than a stale request snapshot.
 - Updated the shared validation fixture and added a regression test for missing `platformRedPacketMerchantShare`.
+
+## Approval review follow-up
+
+- Guarded collection upload status writes with a conditional non-confirmed update; a confirmation race returns conflict and removes the just-created upload rather than regressing `CONFIRMED`.
+- Confirmed retries now prove persisted `CONFIRMED` plus exactly two collection orders before success; legacy/incomplete confirmations remain conflicts.
+- Expanded D1 migration regression through migrations 0001–0007, including the new column/table and a duplicate reservation uniqueness check. Duplicate responses now include only safe merchant/platform/collection-time metadata.

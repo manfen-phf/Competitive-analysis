@@ -42,6 +42,10 @@ if mode == "transaction":
 else:
     connection.executescript(migration)
 
+for migration in ("0005_collection_duplicate_uploads.sql", "0006_order_red_packet_merchant_share.sql", "0007_image_hash_reservation.sql"):
+    with open(os.path.join(root, "migrations", migration), encoding="utf-8") as source:
+        connection.executescript(source.read())
+
 success = connection.execute("""
 SELECT c.status, u.collectionId, u.platform, u.recognitionStatus, u.legacyImageData IS NOT NULL
 FROM Upload u JOIN CollectionTask c ON c.id = u.collectionId
@@ -53,6 +57,12 @@ FROM Upload u JOIN CollectionTask c ON c.id = u.collectionId
 WHERE u.id = 'upload-failed'
 """).fetchone()
 order_number = next(column for column in connection.execute("PRAGMA table_info('OrderRecord')") if column[1] == 'orderNumber')
+connection.execute("INSERT INTO ImageHashReservation (imageHash) VALUES ('parallel-hash')")
+try:
+    connection.execute("INSERT INTO ImageHashReservation (imageHash) VALUES ('parallel-hash')")
+    reservation_unique = False
+except sqlite3.IntegrityError:
+    reservation_unique = True
 
 print(json.dumps({
     "success": success,
@@ -60,6 +70,9 @@ print(json.dumps({
     "orderNumberNotNull": order_number[3],
     "orderCount": connection.execute("SELECT COUNT(*) FROM OrderRecord").fetchone()[0],
     "failureCount": connection.execute("SELECT COUNT(*) FROM RecognitionFailure").fetchone()[0],
+    "hasMerchantShare": any(column[1] == "platformRedPacketMerchantShare" for column in connection.execute("PRAGMA table_info('OrderRecord')")),
+    "reservationTable": connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ImageHashReservation'").fetchone()[0],
+    "reservationUnique": reservation_unique,
     "foreignKeyViolations": connection.execute("PRAGMA foreign_key_check").fetchall(),
 }))
 `;
@@ -70,6 +83,9 @@ const expectedBackfill = {
   orderNumberNotNull: 0,
   orderCount: 1,
   failureCount: 1,
+  hasMerchantShare: true,
+  reservationTable: "ImageHashReservation",
+  reservationUnique: true,
   foreignKeyViolations: [],
 };
 

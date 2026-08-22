@@ -136,7 +136,13 @@ function toOrderData(collection: ConfirmableCollection, upload: ConfirmableUploa
 
 export async function confirmCollection({ collection, user, reviews, database }: ConfirmCollectionInput) {
   if (!canMutateCollection(user, collection)) return { ok: false as const, error: "无权操作此采集任务" };
-  if (collection.status === "CONFIRMED") return { ok: true as const, orderCount: 2, alreadyConfirmed: true as const };
+  if (collection.status === "CONFIRMED") {
+    const verified = await database.$transaction(async (transaction) => {
+      const [persisted, orderCount] = await Promise.all([transaction.collectionTask.findUnique({ where: { id: collection.id }, select: { status: true } }), transaction.orderRecord.count({ where: { upload: { collectionId: collection.id } } })]);
+      return persisted?.status === "CONFIRMED" && orderCount === 2;
+    });
+    return verified ? { ok: true as const, orderCount: 2, alreadyConfirmed: true as const } : { ok: false as const, error: "采集任务当前不可确认" };
+  }
 
   const draft = {
     merchantId: collection.merchantId,
