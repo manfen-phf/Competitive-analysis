@@ -17,6 +17,7 @@ model AppUser {
   city         String?
   bdName       String?
   sessions     AppSession[]
+  createdCollections CollectionTask[]
 
   @@index([role, city])
   @@index([bdName])
@@ -63,14 +64,44 @@ model MerchantAssignment {
   @@index([merchantId, effectiveFrom])
 }
 
+model CollectionTask {
+  id                  String   @id @default(cuid())
+  merchantId          String
+  merchantName        String
+  city                String
+  bdName              String
+  originalDeliveryFee Float
+  createdByUserId     String?
+  // SQLite/D1 stores states as checked text rather than native enums.
+  status              String   @default("DRAFT")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  createdByUser       AppUser? @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  uploads             Upload[]
+
+  @@index([merchantId, createdAt])
+  @@index([city, bdName, status])
+  @@index([createdByUserId])
+}
+
 model Upload {
   id            String              @id @default(cuid())
-  imageData     Bytes
+  legacyImageData Bytes?
   imageMimeType String
   imageHash     String              @unique
   imageAccessToken String         @unique
   uploadedAt DateTime            @default(now())
   order      OrderRecord?
+  collectionId String
+  collection   CollectionTask @relation(fields: [collectionId], references: [id], onDelete: Restrict)
+  // Historical uploads can lack platform attribution; new images must provide one at the API boundary.
+  platform    String?
+  recognitionStatus String @default("PENDING")
+  recognitionResult String?
+  storageReference String?
+
+  @@index([collectionId, platform])
+  @@index([recognitionStatus])
   failure    RecognitionFailure?
 }
 
@@ -78,7 +109,7 @@ model OrderRecord {
   id          String @id @default(cuid())
   uploadId    String @unique
   upload      Upload @relation(fields: [uploadId], references: [id])
-  orderNumber String @unique
+  orderNumber String? @unique
   platform    String
   merchantId  String
   merchantName String @default("")

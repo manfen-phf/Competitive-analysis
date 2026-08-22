@@ -18,6 +18,10 @@ describe("validateRecognition", () => {
     expect(validateRecognition({ ...validPayload, userPaidAmount: null }).ok).toBe(false);
   });
 
+  it("accepts recognition without an order number", () => {
+    expect(validateRecognition({ ...validPayload, orderNumber: undefined }).ok).toBe(true);
+  });
+
   it("rejects inconsistent delivery fees", () => {
     expect(validateRecognition({ ...validPayload, paidDeliveryFee: 3 }).ok).toBe(false);
   });

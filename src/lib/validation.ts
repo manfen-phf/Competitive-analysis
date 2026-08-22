@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const money = z.number().finite().nonnegative();
 export const recognitionSchema = z.object({
-  platform: z.enum(["MEITUAN", "B_JIA"]), orderNumber: z.string().min(1),
+  platform: z.enum(["MEITUAN", "B_JIA"]), orderNumber: z.string().trim().min(1).optional(),
   dishPrice: money, packagingFee: money, platformRedPacket: money, originalDeliveryFee: money,
   deliveryFeeReduction: money, paidDeliveryFee: money, merchantSettlementAmount: z.number().finite(),
   userPaidAmount: money, otherPromotion: money, technicalServiceFee: money, deliveryServiceFee: money,
