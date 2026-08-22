@@ -21,9 +21,16 @@ export const SESSION_COOKIE_NAME = "competition_session";
 const PASSWORD_KEY_LENGTH = 64;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const scrypt = promisify(scryptCallback);
+let bootstrapInFlight: Promise<void> | undefined;
 
 function hashSessionToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
+}
+
+export function hasValidAccountScope(role: string, city: string | null, bdName: string | null) {
+  if (role === "CITY_ADMIN") return Boolean(city?.trim());
+  if (role === "BD") return Boolean(city?.trim() && bdName?.trim());
+  return role === "SUPER_ADMIN";
 }
 
 export async function hashPassword(password: string) {
@@ -80,6 +87,8 @@ export async function clearSession() {
 }
 
 export async function getSession(): Promise<SessionUser | null> {
+  await ensureBootstrapSuperAdmin();
+
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
   if (!token) return null;
@@ -90,7 +99,7 @@ export async function getSession(): Promise<SessionUser | null> {
     include: { user: true },
   });
 
-  if (!session || session.expiresAt <= new Date()) return null;
+  if (!session || session.expiresAt <= new Date() || !hasValidAccountScope(session.user.role, session.user.city, session.user.bdName)) return null;
 
   return {
     id: session.user.id,
@@ -101,7 +110,7 @@ export async function getSession(): Promise<SessionUser | null> {
   };
 }
 
-export async function ensureBootstrapSuperAdmin() {
+async function createBootstrapSuperAdmin() {
   const prisma = await getPrisma();
   if (await prisma.appUser.count()) return;
 
@@ -111,11 +120,26 @@ export async function ensureBootstrapSuperAdmin() {
   ]);
   if (!username || !password) return;
 
-  await prisma.appUser.create({
-    data: {
-      username,
-      passwordHash: await hashPassword(password),
-      role: "SUPER_ADMIN",
-    },
-  });
+  try {
+    await prisma.appUser.create({
+      data: {
+        username,
+        passwordHash: await hashPassword(password),
+        role: "SUPER_ADMIN",
+      },
+    });
+  } catch (error) {
+    if (typeof error === "object" && error !== null && "code" in error && error.code === "P2002") return;
+    throw error;
+  }
+}
+
+export async function ensureBootstrapSuperAdmin() {
+  if (!bootstrapInFlight) {
+    bootstrapInFlight = createBootstrapSuperAdmin().finally(() => {
+      bootstrapInFlight = undefined;
+    });
+  }
+
+  await bootstrapInFlight;
 }

@@ -8,17 +8,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum AppRole {
-  SUPER_ADMIN
-  CITY_ADMIN
-  BD
-}
-
 model AppUser {
   id           String       @id @default(cuid())
   username     String       @unique
   passwordHash String
-  role         AppRole
+  // SQLite/D1 has no native enum support. The migration constrains this to AppRole values.
+  role         String
   city         String?
   bdName       String?
   sessions     AppSession[]

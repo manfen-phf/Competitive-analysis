@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
   token: undefined as string | undefined,
@@ -12,6 +12,9 @@ const state = vi.hoisted(() => ({
   deletedSessionWhere: undefined as { tokenHash: string } | undefined,
   userCount: 0,
   createdUser: undefined as { data: { username: string; passwordHash: string; role: string } } | undefined,
+  createCalls: 0,
+  countCalls: 0,
+  createError: undefined as unknown,
   secrets: {} as Record<string, string | undefined>,
 }));
 
@@ -39,8 +42,13 @@ vi.mock("@/lib/db", () => ({
       },
     },
     appUser: {
-      count: async () => state.userCount,
+      count: async () => {
+        state.countCalls += 1;
+        return state.userCount;
+      },
       create: async (input: { data: { username: string; passwordHash: string; role: string } }) => {
+        state.createCalls += 1;
+        if (state.createError) throw state.createError;
         state.createdUser = input;
       },
     },
@@ -51,7 +59,30 @@ vi.mock("@/lib/runtime-secrets", () => ({
   getRuntimeSecret: async (name: string) => state.secrets[name],
 }));
 
-import { clearSession, createSession, ensureBootstrapSuperAdmin, getSession, hashPassword, verifyPassword } from "@/lib/auth";
+import {
+  clearSession,
+  createSession,
+  ensureBootstrapSuperAdmin,
+  getSession,
+  hasValidAccountScope,
+  hashPassword,
+  verifyPassword,
+} from "@/lib/auth";
+
+beforeEach(() => {
+  state.token = undefined;
+  state.cookieSet = undefined;
+  state.cookieDeleted = undefined;
+  state.session = undefined;
+  state.createdSession = undefined;
+  state.deletedSessionWhere = undefined;
+  state.userCount = 0;
+  state.createdUser = undefined;
+  state.createCalls = 0;
+  state.countCalls = 0;
+  state.createError = undefined;
+  state.secrets = {};
+});
 
 describe("password helpers", () => {
   it("verifies the original password but rejects a different password", async () => {
@@ -87,6 +118,15 @@ describe("getSession", () => {
       city: "玉林",
       bdName: "张三",
     });
+    expect(state.countCalls).toBe(1);
+  });
+});
+
+describe("account scope validation", () => {
+  it("requires both city and BD name for BD accounts", () => {
+    expect(hasValidAccountScope("BD", "玉林", "张三")).toBe(true);
+    expect(hasValidAccountScope("BD", null, "张三")).toBe(false);
+    expect(hasValidAccountScope("BD", "玉林", null)).toBe(false);
   });
 });
 
@@ -144,12 +184,43 @@ describe("bootstrap super administrator", () => {
   });
 
   it("does nothing when either bootstrap secret is missing", async () => {
-    state.userCount = 0;
-    state.createdUser = undefined;
     state.secrets = { SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin" };
 
     await ensureBootstrapSuperAdmin();
 
     expect(state.createdUser).toBeUndefined();
+  });
+
+  it("does nothing when an account already exists", async () => {
+    state.userCount = 1;
+    state.secrets = {
+      SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
+      SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
+    };
+
+    await ensureBootstrapSuperAdmin();
+
+    expect(state.createdUser).toBeUndefined();
+  });
+
+  it("coalesces concurrent bootstrap initialization into one create", async () => {
+    state.secrets = {
+      SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
+      SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
+    };
+
+    await Promise.all([ensureBootstrapSuperAdmin(), ensureBootstrapSuperAdmin()]);
+
+    expect(state.createCalls).toBe(1);
+  });
+
+  it("treats a concurrent unique-username insert as an already-completed bootstrap", async () => {
+    state.secrets = {
+      SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
+      SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
+    };
+    state.createError = { code: "P2002" };
+
+    await expect(ensureBootstrapSuperAdmin()).resolves.toBeUndefined();
   });
 });

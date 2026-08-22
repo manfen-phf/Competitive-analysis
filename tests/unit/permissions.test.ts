@@ -25,6 +25,21 @@ describe("order permissions", () => {
     expect(canExportCity(bd, "玉林")).toBe(false);
   });
 
+  it("denies a BD access to a same-named BD's orders in another city", () => {
+    const yulinZhangSan = { role: "BD" as const, city: "玉林", bdName: "张三" };
+    const nanningZhangSanOrder = { city: "南宁", bdName: "张三" };
+
+    expect(canReadOrder(yulinZhangSan, nanningZhangSanOrder)).toBe(false);
+    expect(canMutateOrder(yulinZhangSan, nanningZhangSanOrder)).toBe(false);
+  });
+
+  it("fails closed for a BD account without both its city and name", () => {
+    const incompleteBd = { role: "BD" as const, city: null, bdName: "张三" };
+
+    expect(canReadOrder(incompleteBd, ownCityOrder)).toBe(false);
+    expect(canMutateOrder(incompleteBd, ownCityOrder)).toBe(false);
+  });
+
   it("gives a super administrator full order and export access", () => {
     const admin = { role: "SUPER_ADMIN" as const, city: null, bdName: null };
 

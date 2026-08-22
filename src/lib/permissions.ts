@@ -5,13 +5,13 @@ type ScopedOrder = { city: string; bdName: string };
 
 export function canReadOrder(user: PermissionUser, order: ScopedOrder) {
   if (user.role === "SUPER_ADMIN" || user.role === "CITY_ADMIN") return true;
-  return user.role === "BD" && user.bdName === order.bdName;
+  return user.role === "BD" && user.city === order.city && user.bdName === order.bdName;
 }
 
 export function canMutateOrder(user: PermissionUser, order: ScopedOrder) {
   if (user.role === "SUPER_ADMIN") return true;
   if (user.role === "CITY_ADMIN") return user.city === order.city;
-  return user.role === "BD" && user.bdName === order.bdName;
+  return user.role === "BD" && user.city === order.city && user.bdName === order.bdName;
 }
 
 export function canExportCity(user: PermissionUser, city: string) {

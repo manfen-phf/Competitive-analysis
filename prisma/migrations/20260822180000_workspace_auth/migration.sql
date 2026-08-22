@@ -1,16 +1,15 @@
--- CreateEnum
-CREATE TYPE "AppRole" AS ENUM ('SUPER_ADMIN', 'CITY_ADMIN', 'BD');
-
 -- CreateTable
 CREATE TABLE "AppUser" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "passwordHash" TEXT NOT NULL,
-    "role" "AppRole" NOT NULL,
+    "role" TEXT NOT NULL CHECK ("role" IN ('SUPER_ADMIN', 'CITY_ADMIN', 'BD')),
     "city" TEXT,
     "bdName" TEXT,
 
-    CONSTRAINT "AppUser_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "AppUser_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "AppUser_city_admin_city_required" CHECK ("role" != 'CITY_ADMIN' OR ("city" IS NOT NULL AND length(trim("city")) > 0)),
+    CONSTRAINT "AppUser_bd_scope_required" CHECK ("role" != 'BD' OR ("city" IS NOT NULL AND length(trim("city")) > 0 AND "bdName" IS NOT NULL AND length(trim("bdName")) > 0))
 );
 
 -- CreateTable
@@ -18,10 +17,11 @@ CREATE TABLE "AppSession" (
     "id" TEXT NOT NULL,
     "tokenHash" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3) NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expiresAt" DATETIME NOT NULL,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "AppSession_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "AppSession_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "AppSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "AppUser" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 -- CreateIndex
@@ -38,6 +38,3 @@ CREATE UNIQUE INDEX "AppSession_tokenHash_key" ON "AppSession"("tokenHash");
 
 -- CreateIndex
 CREATE INDEX "AppSession_expiresAt_idx" ON "AppSession"("expiresAt");
-
--- AddForeignKey
-ALTER TABLE "AppSession" ADD CONSTRAINT "AppSession_userId_fkey" FOREIGN KEY ("userId") REFERENCES "AppUser"("id") ON DELETE CASCADE ON UPDATE CASCADE;
