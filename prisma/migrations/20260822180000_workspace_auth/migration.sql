@@ -26,11 +26,21 @@ CREATE TABLE "AppSession" (
 
 -- CreateTable
 CREATE TABLE "AppBootstrap" (
-    "id" TEXT NOT NULL,
+    "id" TEXT NOT NULL CHECK ("id" = 'first-super-admin'),
+    "ownerToken" TEXT NOT NULL,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "AppBootstrap_pkey" PRIMARY KEY ("id")
 );
+
+-- Enforce the durable bootstrap invariant even when a client bypasses the
+-- conditional sentinel insertion used by the application.
+CREATE TRIGGER "AppBootstrap_requires_empty_user_table"
+BEFORE INSERT ON "AppBootstrap"
+WHEN EXISTS (SELECT 1 FROM "AppUser")
+BEGIN
+    SELECT RAISE(ABORT, 'bootstrap requires empty AppUser table');
+END;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "AppUser_username_key" ON "AppUser"("username");

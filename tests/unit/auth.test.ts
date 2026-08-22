@@ -17,6 +17,7 @@ const state = vi.hoisted(() => ({
   countCalls: 0,
   createError: undefined as unknown,
   getPrismaError: undefined as unknown,
+  d1: undefined as unknown,
   secrets: {} as Record<string, string | undefined>,
 }));
 
@@ -90,6 +91,10 @@ vi.mock("@/lib/runtime-secrets", () => ({
   getRuntimeSecret: async (name: string) => state.secrets[name],
 }));
 
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: async () => ({ env: { DB: state.d1 } }),
+}));
+
 import {
   clearSession,
   bootstrapFirstSuperAdmin,
@@ -116,48 +121,50 @@ beforeEach(() => {
   state.countCalls = 0;
   state.createError = undefined;
   state.getPrismaError = undefined;
+  state.d1 = undefined;
   state.secrets = {};
 });
 
 function createDurableBootstrapDatabase(options?: { failFirstUserCreate?: boolean }) {
-  const database = { hasSentinel: false, users: [] as Array<{ username: string; passwordHash: string; role: string }> };
+  const database = {
+    hasSentinel: false,
+    ownerToken: undefined as string | undefined,
+    users: [] as Array<{ username: string; passwordHash: string; role: string }>,
+  };
   let failFirstUserCreate = options?.failFirstUserCreate ?? false;
-  let transactionQueue = Promise.resolve();
-
   const client = () => ({
-    $transaction: <T,>(callback: (tx: {
-      appUser: {
-        count: () => Promise<number>;
-        create: (input: { data: { username: string; passwordHash: string; role: string } }) => Promise<void>;
-      };
-      appBootstrap: { create: () => Promise<void> };
-    }) => Promise<T>) => {
-      const transaction = transactionQueue.then(async () => {
-        const staged = { hasSentinel: database.hasSentinel, users: [...database.users] };
-        const result = await callback({
-          appUser: {
-            count: async () => staged.users.length,
-            create: async ({ data }) => {
-              if (failFirstUserCreate) {
-                failFirstUserCreate = false;
-                throw new Error("simulated user insert failure");
-              }
-              staged.users.push(data);
-            },
-          },
-          appBootstrap: {
-            create: async () => {
-              if (staged.hasSentinel) throw { code: "P2002" };
-              staged.hasSentinel = true;
-            },
-          },
-        });
-        database.hasSentinel = staged.hasSentinel;
-        database.users = staged.users;
-        return result;
-      });
-      transactionQueue = transaction.then(() => undefined, () => undefined);
-      return transaction;
+    prepare: (sql: string) => ({ bind: (...values: string[]) => ({ sql, values }) }),
+    batch: async (statements: Array<{ sql: string; values: string[] }>) => {
+      const staged = { hasSentinel: database.hasSentinel, ownerToken: database.ownerToken, users: [...database.users] };
+      const results: Array<{ meta: { changes: number } }> = [];
+
+      for (const statement of statements) {
+        if (statement.sql.includes('INSERT INTO "AppBootstrap"')) {
+          const [, ownerToken] = statement.values;
+          const acquired = staged.users.length === 0 && !staged.hasSentinel;
+          if (acquired) {
+            staged.hasSentinel = true;
+            staged.ownerToken = ownerToken;
+          }
+          results.push({ meta: { changes: acquired ? 1 : 0 } });
+          continue;
+        }
+
+        if (failFirstUserCreate) {
+          failFirstUserCreate = false;
+          throw new Error("simulated user insert failure");
+        }
+
+        const [, username, passwordHash, role, , ownerToken] = statement.values;
+        const created = staged.users.length === 0 && staged.hasSentinel && staged.ownerToken === ownerToken;
+        if (created) staged.users.push({ username: username!, passwordHash: passwordHash!, role: role! });
+        results.push({ meta: { changes: created ? 1 : 0 } });
+      }
+
+      database.hasSentinel = staged.hasSentinel;
+      database.ownerToken = staged.ownerToken;
+      database.users = staged.users;
+      return results;
     },
   });
 
@@ -250,7 +257,8 @@ describe("session cookie helpers", () => {
 
 describe("bootstrap super administrator", () => {
   it("creates the first administrator from runtime secrets only when the user table is empty", async () => {
-    state.userCount = 0;
+    const durable = createDurableBootstrapDatabase();
+    state.d1 = durable.client();
     state.secrets = {
       SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
       SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
@@ -258,8 +266,8 @@ describe("bootstrap super administrator", () => {
 
     await ensureBootstrapSuperAdmin();
 
-    expect(state.createdUser).toMatchObject({ data: { username: "admin", role: "SUPER_ADMIN" } });
-    await expect(verifyPassword("bootstrap-pass", state.createdUser!.data.passwordHash)).resolves.toBe(true);
+    expect(durable.database.users[0]).toMatchObject({ username: "admin", role: "SUPER_ADMIN" });
+    await expect(verifyPassword("bootstrap-pass", durable.database.users[0]!.passwordHash)).resolves.toBe(true);
   });
 
   it("does nothing when either bootstrap secret is missing", async () => {
@@ -271,7 +279,9 @@ describe("bootstrap super administrator", () => {
   });
 
   it("does nothing when an account already exists", async () => {
-    state.userCount = 1;
+    const durable = createDurableBootstrapDatabase();
+    durable.database.users.push({ username: "existing", passwordHash: "hash", role: "SUPER_ADMIN" });
+    state.d1 = durable.client();
     state.secrets = {
       SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
       SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
@@ -279,10 +289,12 @@ describe("bootstrap super administrator", () => {
 
     await ensureBootstrapSuperAdmin();
 
-    expect(state.createdUser).toBeUndefined();
+    expect(durable.database.hasSentinel).toBe(false);
   });
 
   it("coalesces concurrent bootstrap initialization into one create", async () => {
+    const durable = createDurableBootstrapDatabase();
+    state.d1 = durable.client();
     state.secrets = {
       SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
       SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
@@ -290,17 +302,19 @@ describe("bootstrap super administrator", () => {
 
     await Promise.all([ensureBootstrapSuperAdmin(), ensureBootstrapSuperAdmin()]);
 
-    expect(state.createCalls).toBe(1);
+    expect(durable.database.users).toHaveLength(1);
   });
 
-  it("treats a concurrent unique-username insert as an already-completed bootstrap", async () => {
+  it("treats an existing durable sentinel as an already-completed bootstrap", async () => {
+    const durable = createDurableBootstrapDatabase();
+    durable.database.hasSentinel = true;
+    durable.database.ownerToken = "another-instance";
+    state.d1 = durable.client();
     state.secrets = {
       SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
       SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
     };
-    state.createError = { code: "P2002" };
-
-    await expect(ensureBootstrapSuperAdmin()).resolves.toBeUndefined();
+    await expect(ensureBootstrapSuperAdmin()).resolves.toBe(false);
   });
 
   it("allows only one of two independent instances to acquire a durable bootstrap sentinel", async () => {
@@ -329,8 +343,15 @@ describe("bootstrap super administrator", () => {
 
 describe("authentication initialization", () => {
   it("does not fail the application request when bootstrap dependencies are unavailable", async () => {
-    state.getPrismaError = new Error("database unavailable");
+    state.d1 = { prepare: () => ({ bind: () => ({}) }), batch: async () => { throw new Error("database unavailable"); } };
+    state.secrets = {
+      SUPER_ADMIN_BOOTSTRAP_USERNAME: "admin",
+      SUPER_ADMIN_BOOTSTRAP_PASSWORD: "bootstrap-pass",
+    };
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
-    await expect(initializeAuthentication()).resolves.toBeUndefined();
+    await expect(initializeAuthentication()).resolves.toBe("failed");
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
   });
 });

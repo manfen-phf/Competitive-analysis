@@ -35,6 +35,7 @@ model AppSession {
 
 model AppBootstrap {
   id        String   @id
+  ownerToken String
   createdAt DateTime @default(now())
 }
 

@@ -22,20 +22,15 @@ const PASSWORD_KEY_LENGTH = 64;
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 const scrypt = promisify(scryptCallback);
 const BOOTSTRAP_SENTINEL_ID = "first-super-admin";
-let bootstrapInFlight: Promise<void> | undefined;
+let bootstrapInFlight: Promise<boolean> | undefined;
 
 type BootstrapUser = { username: string; passwordHash: string; role: "SUPER_ADMIN" };
-type BootstrapTransaction = {
-  appUser: {
-    count: () => Promise<number>;
-    create: (input: { data: BootstrapUser }) => Promise<unknown>;
-  };
-  appBootstrap: {
-    create: (input: { data: { id: string } }) => Promise<unknown>;
-  };
+type D1Statement = {
+  bind: (...values: string[]) => unknown;
 };
 type BootstrapDatabase = {
-  $transaction: <T>(operation: (transaction: BootstrapTransaction) => Promise<T>) => Promise<T>;
+  prepare: (sql: string) => D1Statement;
+  batch: (statements: any[]) => Promise<Array<{ meta?: { changes?: number } }>>;
 };
 
 function hashSessionToken(token: string) {
@@ -125,38 +120,53 @@ export async function getSession(): Promise<SessionUser | null> {
   };
 }
 
-function isUniqueConstraintError(error: unknown) {
-  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
-}
-
 export async function bootstrapFirstSuperAdmin(
   database: BootstrapDatabase,
   user: Pick<BootstrapUser, "username" | "passwordHash">,
 ) {
-  try {
-    return await database.$transaction(async (transaction) => {
-      if (await transaction.appUser.count()) return false;
+  const ownerToken = randomBytes(16).toString("hex");
+  const sentinel = database.prepare(`
+    INSERT INTO "AppBootstrap" ("id", "ownerToken")
+    SELECT ?, ?
+    WHERE NOT EXISTS (SELECT 1 FROM "AppUser")
+    ON CONFLICT("id") DO NOTHING
+  `).bind(BOOTSTRAP_SENTINEL_ID, ownerToken);
+  const firstUser = database.prepare(`
+    INSERT INTO "AppUser" ("id", "username", "passwordHash", "role")
+    SELECT ?, ?, ?, ?
+    WHERE EXISTS (
+      SELECT 1 FROM "AppBootstrap"
+      WHERE "id" = ? AND "ownerToken" = ?
+    )
+    AND NOT EXISTS (SELECT 1 FROM "AppUser")
+  `).bind(randomBytes(16).toString("hex"), user.username, user.passwordHash, "SUPER_ADMIN", BOOTSTRAP_SENTINEL_ID, ownerToken);
+  const results = await database.batch([sentinel, firstUser]);
 
-      await transaction.appBootstrap.create({ data: { id: BOOTSTRAP_SENTINEL_ID } });
-      await transaction.appUser.create({ data: { ...user, role: "SUPER_ADMIN" } });
-      return true;
-    });
-  } catch (error) {
-    if (isUniqueConstraintError(error)) return false;
-    throw error;
+  return results[0]?.meta?.changes === 1 && results[1]?.meta?.changes === 1;
+}
+
+async function getD1BootstrapDatabase(): Promise<BootstrapDatabase | null> {
+  try {
+    const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+    const { env } = await getCloudflareContext({ async: true });
+    const database = (env as { DB?: BootstrapDatabase }).DB;
+    return database ?? null;
+  } catch {
+    return null;
   }
 }
 
 async function createBootstrapSuperAdmin() {
-  const prisma = await getPrisma();
-
   const [username, password] = await Promise.all([
     getRuntimeSecret("SUPER_ADMIN_BOOTSTRAP_USERNAME"),
     getRuntimeSecret("SUPER_ADMIN_BOOTSTRAP_PASSWORD"),
   ]);
-  if (!username || !password) return;
+  if (!username || !password) return false;
 
-  await bootstrapFirstSuperAdmin(prisma as unknown as BootstrapDatabase, {
+  const database = await getD1BootstrapDatabase();
+  if (!database) throw new Error("Cloudflare D1 bootstrap database is unavailable");
+
+  return bootstrapFirstSuperAdmin(database, {
     username,
     passwordHash: await hashPassword(password),
   });
@@ -169,13 +179,14 @@ export async function ensureBootstrapSuperAdmin() {
     });
   }
 
-  await bootstrapInFlight;
+  return bootstrapInFlight;
 }
 
 export async function initializeAuthentication() {
   try {
-    await ensureBootstrapSuperAdmin();
-  } catch {
-    // Requests remain available while the database or runtime bindings initialize.
+    return (await ensureBootstrapSuperAdmin()) ? "initialized" : "skipped";
+  } catch (error) {
+    console.error("Authentication bootstrap failed", error);
+    return "failed";
   }
 }
