@@ -25,4 +25,25 @@ describe("buildAnalyticsSnapshot", () => {
     expect(result.comparison.find((item) => item.key === "dishPrice")?.difference).toBe(-2);
     expect(result.merchantRanking[0].merchantName).toBe("甲店");
   });
+
+  it("does not rank a merchant until both platforms have an observation", () => {
+    const partial = [rows[0], { ...rows[1], merchantId: "2", merchantName: "乙店", platform: "MEITUAN" as const }];
+
+    expect(buildAnalyticsSnapshot(partial, { metric: "dishPrice" }).merchantRanking).toEqual([]);
+  });
+
+  it("keeps empty and partial observations truthful", () => {
+    const empty = buildAnalyticsSnapshot([], { metric: "dishPrice" });
+    const partial = buildAnalyticsSnapshot([rows[0]], { metric: "dishPrice" });
+
+    expect(empty.comparison).toEqual([]);
+    expect(partial.comparison.find((row) => row.key === "dishPrice")).toMatchObject({ meituan: 30, bJia: null, difference: null });
+    expect(partial.trend[0]).toMatchObject({ meituan: 30, bJia: null, meituanObservationCount: 1, bJiaObservationCount: 0 });
+  });
+
+  it("keeps an observed numeric zero distinct from an absent platform observation", () => {
+    const observedZero = buildAnalyticsSnapshot([{ ...rows[0], userPaidAmount: 0 }], { metric: "userPaidAmount" });
+
+    expect(observedZero.trend[0]).toMatchObject({ meituan: 0, bJia: null, meituanObservationCount: 1, bJiaObservationCount: 0 });
+  });
 });

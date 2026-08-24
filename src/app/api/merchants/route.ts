@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const requestedCity = request.nextUrl.searchParams.get("city")?.trim();
   const query = request.nextUrl.searchParams.get("query")?.trim() ?? "";
-  const demo = request.nextUrl.searchParams.get("demo") !== "0";
+  const demoRequested = request.nextUrl.searchParams.get("demo") === "1";
   if (!requestedCity) return NextResponse.json({ error: "请选择城市" }, { status: 400 });
   if (user.role === "BD" && requestedCity !== user.city) return NextResponse.json({ error: "无权查看该城市商家" }, { status: 403 });
 
@@ -33,7 +33,9 @@ export async function GET(request: NextRequest) {
     // Local demo remains available when D1 is not configured.
   }
 
-  const demoMerchants = demo
+  // Never mix real merchants with sample merchants, and never surface sample
+  // merchants to a BD because they are not active assignment records.
+  const demoMerchants = merchants.length === 0 && demoRequested && user.role !== "BD"
     ? filterOrdersForUser(user, DEMO_RECORDS)
       .filter((record) => record.city === requestedCity && (!query || record.merchantId.includes(query) || record.merchantName.includes(query)))
       .filter((record, index, records) => records.findIndex((item) => item.merchantId === record.merchantId) === index)

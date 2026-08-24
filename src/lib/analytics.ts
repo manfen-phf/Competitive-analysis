@@ -60,6 +60,36 @@ const platforms: Platform[] = ["MEITUAN", "B_JIA"];
 
 function asNumber(value: unknown) { return Number.isFinite(Number(value)) ? Number(value) : 0; }
 function average(rows: ComparableRecord[], key: MetricKey) { return rows.length === 0 ? 0 : rows.reduce((sum, row) => sum + asNumber(row[key]), 0) / rows.length; }
+const pad = (value: number) => String(value).padStart(2, "0");
+const dateValue = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+export type NaturalWeek = { label: string; start: string; end: string };
+
+/** Natural weeks begin with Jan 1–the first Sunday, then run Monday–Sunday. */
+export function naturalWeeksForYear(year: number): NaturalWeek[] {
+  const yearStart = new Date(year, 0, 1);
+  const yearEnd = new Date(year, 11, 31);
+  const firstMondayOffset = (8 - yearStart.getDay()) % 7;
+  const weeks: NaturalWeek[] = [];
+  let weekNumber = 1;
+  let start = new Date(year, 0, 1);
+
+  if (firstMondayOffset > 0) {
+    const end = new Date(year, 0, firstMondayOffset);
+    weeks.push({ label: `${year} W${weekNumber}`, start: dateValue(start), end: dateValue(end) });
+    start = new Date(year, 0, firstMondayOffset + 1);
+    weekNumber += 1;
+  }
+
+  while (start <= yearEnd) {
+    const end = new Date(Math.min(new Date(year, 11, 31).valueOf(), new Date(year, start.getMonth(), start.getDate() + 6).valueOf()));
+    weeks.push({ label: `${year} W${weekNumber}`, start: dateValue(start), end: dateValue(end) });
+    start = new Date(year, start.getMonth(), start.getDate() + 7);
+    weekNumber += 1;
+  }
+
+  return weeks;
+}
 
 /** Natural weeks keep Jan 1 through the first Sunday in W1. */
 export function periodLabel(date: Date, period: PeriodKey) {
@@ -69,18 +99,32 @@ export function periodLabel(date: Date, period: PeriodKey) {
   if (period === "YEAR") return String(year);
   if (period === "MONTH") return `${year}-${month}`;
   if (period === "DAY") return `${year}-${month}-${day}`;
-  const yearStart = new Date(year, 0, 1);
-  const localDate = new Date(year, date.getMonth(), date.getDate());
-  const dayIndex = Math.round((localDate.getTime() - yearStart.getTime()) / 86_400_000);
-  const daysBeforeFirstMonday = (8 - yearStart.getDay()) % 7;
-  const week = dayIndex < daysBeforeFirstMonday ? 1 : Math.floor((dayIndex - daysBeforeFirstMonday) / 7) + 2;
-  return `${year} W${week}`;
+  const dateString = dateValue(new Date(year, date.getMonth(), date.getDate()));
+  return naturalWeeksForYear(year).find((week) => dateString >= week.start && dateString <= week.end)?.label ?? `${year} W1`;
 }
 
-export function filterOrdersForUser(user: AnalysisUserScope, records: ComparableRecord[]) {
+export function filterOrdersForUser(user: AnalysisUserScope, records: ComparableRecord[], allowedMerchantIds?: ReadonlySet<string>) {
   if (user.role !== "BD") return records;
   if (!user.city || !user.bdName) return [];
-  return records.filter((record) => record.city === user.city && record.bdName === user.bdName);
+  return records.filter((record) => record.city === user.city && record.bdName === user.bdName && (!allowedMerchantIds || allowedMerchantIds.has(record.merchantId)));
+}
+
+export type AnalyticsDataSource = "REAL" | "DEMO" | "EMPTY";
+export type AnalyticsDataset = { records: ComparableRecord[]; source: AnalyticsDataSource };
+
+/** A real snapshot always wins. Demo data is a labelled fallback and is never mixed in. */
+export function chooseAnalyticsDataset({ user, realRecords, demoRecords, allowedMerchantIds, allowDemo }: {
+  user: AnalysisUserScope;
+  realRecords: ComparableRecord[];
+  demoRecords: ComparableRecord[];
+  allowedMerchantIds?: ReadonlySet<string>;
+  allowDemo: boolean;
+}): AnalyticsDataset {
+  const real = filterOrdersForUser(user, realRecords, allowedMerchantIds);
+  if (real.length) return { records: real, source: "REAL" };
+  if (!allowDemo) return { records: [], source: "EMPTY" };
+  const demo = filterOrdersForUser(user, demoRecords, allowedMerchantIds);
+  return demo.length ? { records: demo, source: "DEMO" } : { records: [], source: "EMPTY" };
 }
 
 export function averageByPlatform(records: PriceRecord[]) {
@@ -105,8 +149,8 @@ export function merchantPriceRanking(records: MerchantPriceRecord[]) {
 export type AnalyticsSnapshot = {
   totalOrders: number;
   platforms: Record<Platform, { validOrderCount: number } & Record<MetricKey, number>>;
-  comparison: Array<{ key: MetricKey; label: string; meituan: number; bJia: number; difference: number; unit: "money" | "percent" }>;
-  trend: Array<{ label: string; meituan: number; bJia: number }>;
+  comparison: Array<{ key: MetricKey; label: string; meituan: number | null; bJia: number | null; difference: number | null; unit: "money" | "percent" }>;
+  trend: Array<{ label: string; meituan: number | null; bJia: number | null; meituanObservationCount: number; bJiaObservationCount: number }>;
   merchantRanking: Array<{ merchantId: string; merchantName: string; city: string; bdName: string; meituan: number; bJia: number; difference: number; unit: "money" | "percent" }>;
   filteredCities: string[];
   filteredBds: string[];
@@ -131,16 +175,27 @@ export function buildAnalyticsSnapshot(records: ComparableRecord[], options: Ana
     result[platform] = { validOrderCount: rows.length, ...Object.fromEntries(metricKeys.map((key) => [key, average(rows, key)])) } as typeof result[Platform];
     return result;
   }, {} as Record<Platform, { validOrderCount: number } & Record<MetricKey, number>>);
-  const comparison = metricKeys.map((key) => ({ key, label: metricLabels[key], meituan: platformAverages.MEITUAN[key], bJia: platformAverages.B_JIA[key], difference: platformAverages.MEITUAN[key] - platformAverages.B_JIA[key], unit: metricUnits[key] }));
+  const comparison = filtered.length ? metricKeys.map((key) => {
+    const meituan = platformAverages.MEITUAN.validOrderCount ? platformAverages.MEITUAN[key] : null;
+    const bJia = platformAverages.B_JIA.validOrderCount ? platformAverages.B_JIA[key] : null;
+    return { key, label: metricLabels[key], meituan, bJia, difference: meituan === null || bJia === null ? null : meituan - bJia, unit: metricUnits[key] };
+  }) : [];
   const buckets = new Map<string, ComparableRecord[]>();
   for (const record of filtered) { const key = periodLabel(new Date(record.uploadedAt), period); buckets.set(key, [...(buckets.get(key) ?? []), record]); }
-  const trend = [...buckets.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([label, rows]) => ({ label, meituan: average(rows.filter((record) => record.platform === "MEITUAN"), metric), bJia: average(rows.filter((record) => record.platform === "B_JIA"), metric) }));
+  const trend = [...buckets.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([label, rows]) => {
+    const meituanRows = rows.filter((record) => record.platform === "MEITUAN");
+    const bJiaRows = rows.filter((record) => record.platform === "B_JIA");
+    return { label, meituan: meituanRows.length ? average(meituanRows, metric) : null, bJia: bJiaRows.length ? average(bJiaRows, metric) : null, meituanObservationCount: meituanRows.length, bJiaObservationCount: bJiaRows.length };
+  });
   const merchantGroups = new Map<string, ComparableRecord[]>();
   for (const record of filtered) merchantGroups.set(record.merchantId, [...(merchantGroups.get(record.merchantId) ?? []), record]);
-  const merchantRanking = [...merchantGroups.entries()].map(([merchantId, rows]) => {
-    const meituan = average(rows.filter((record) => record.platform === "MEITUAN"), metric);
-    const bJia = average(rows.filter((record) => record.platform === "B_JIA"), metric);
+  const merchantRanking = [...merchantGroups.entries()].flatMap(([merchantId, rows]) => {
+    const meituanRows = rows.filter((record) => record.platform === "MEITUAN");
+    const bJiaRows = rows.filter((record) => record.platform === "B_JIA");
+    if (!meituanRows.length || !bJiaRows.length) return [];
+    const meituan = average(meituanRows, metric);
+    const bJia = average(bJiaRows, metric);
     return { merchantId, merchantName: rows[0].merchantName, city: rows[0].city, bdName: rows[0].bdName, meituan, bJia, difference: meituan - bJia, unit: metricUnits[metric] };
-  }).filter((record) => record.meituan || record.bJia).sort((left, right) => Math.abs(right.difference) - Math.abs(left.difference));
+  }).sort((left, right) => Math.abs(right.difference) - Math.abs(left.difference));
   return { totalOrders: filtered.length, platforms: platformAverages, comparison, trend, merchantRanking, filteredCities: [...new Set(filtered.map((record) => record.city))], filteredBds: [...new Set(filtered.map((record) => record.bdName))], filteredMerchants: [...new Set(filtered.map((record) => record.merchantName))] };
 }

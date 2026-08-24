@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const requestedCity = request.nextUrl.searchParams.get("city")?.trim() || undefined;
-  const demo = request.nextUrl.searchParams.get("demo") !== "0";
+  const demoRequested = request.nextUrl.searchParams.get("demo") === "1";
   if (user.role === "BD" && requestedCity && requestedCity !== user.city) return NextResponse.json({ error: "无权查看该城市筛选项" }, { status: 403 });
   const city = user.role === "BD" ? user.city ?? undefined : requestedCity;
   let assignments: { city: string; bdName: string }[] = [];
@@ -27,7 +27,9 @@ export async function GET(request: NextRequest) {
     // Local demo remains available when D1 is not configured.
   }
 
-  const demoRecords = demo ? filterOrdersForUser(user, DEMO_RECORDS) : [];
+  // Never append sample options to real master data. BD users receive only
+  // their active-assignment scope and never get a demo fallback.
+  const demoRecords = assignments.length === 0 && demoRequested && user.role !== "BD" ? filterOrdersForUser(user, DEMO_RECORDS) : [];
   const values = city
     ? [...assignments.map((item) => item.bdName), ...demoRecords.filter((item) => item.city === city).map((item) => item.bdName)]
     : [...assignments.map((item) => item.city), ...demoRecords.map((item) => item.city)];
