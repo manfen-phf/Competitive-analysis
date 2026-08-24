@@ -21,3 +21,12 @@ export function canMutateCollection(user: PermissionUser, collection: ScopedOrde
 export function canExportCity(user: PermissionUser, city: string) {
   return user.role === "SUPER_ADMIN" || (user.role === "CITY_ADMIN" && user.city === city);
 }
+
+/** Data Center is an administrator workspace.  BD accounts use the collection flow instead. */
+export function canManageDataCenter(user: PermissionUser) {
+  return user.role === "SUPER_ADMIN" || user.role === "CITY_ADMIN";
+}
+
+export function canExportOrders(user: PermissionUser, city: string) {
+  return canManageDataCenter(user) && canExportCity(user, city);
+}
