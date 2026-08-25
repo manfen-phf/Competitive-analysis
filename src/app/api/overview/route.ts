@@ -9,9 +9,17 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
 
   const prisma = await getPrisma();
-  const collectionWhere = user.role === "BD" ? { city: user.city ?? "", bdName: user.bdName ?? "" } : {};
+  const assignments = user.role === "BD" && user.city && user.bdName
+    ? await prisma.merchantAssignment.findMany({
+      where: { city: user.city, bdName: user.bdName, version: { isActive: true } },
+      select: { merchantId: true },
+      distinct: ["merchantId"],
+    })
+    : [];
+  const assignedMerchantIds = assignments.map((assignment) => assignment.merchantId);
+  const collectionWhere = user.role === "BD" ? { merchantId: { in: assignedMerchantIds } } : {};
   const orderWhere = user.role === "BD"
-    ? { city: user.city ?? "", bdName: user.bdName ?? "", upload: { collection: { status: "CONFIRMED" } } }
+    ? { merchantId: { in: assignedMerchantIds }, upload: { collection: { status: "CONFIRMED" } } }
     : { upload: { collection: { status: "CONFIRMED" } } };
   const [collections, orders] = await Promise.all([
     prisma.collectionTask.findMany({

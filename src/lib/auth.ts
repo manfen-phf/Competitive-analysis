@@ -43,6 +43,10 @@ export function hasValidAccountScope(role: string, city: string | null, bdName: 
   return role === "SUPER_ADMIN";
 }
 
+export function isAppRole(role: string): role is AppRole {
+  return role === "SUPER_ADMIN" || role === "CITY_ADMIN" || role === "BD";
+}
+
 export async function hashPassword(password: string) {
   const salt = randomBytes(16);
   const derivedKey = (await scrypt(password, salt, PASSWORD_KEY_LENGTH)) as Buffer;
@@ -110,12 +114,15 @@ export async function getSession(): Promise<SessionUser | null> {
     include: { user: true },
   });
 
-  if (!session || session.expiresAt <= new Date() || !hasValidAccountScope(session.user.role, session.user.city, session.user.bdName)) return null;
+  if (!session || session.expiresAt <= new Date()) return null;
+
+  const role = session.user.role;
+  if (!isAppRole(role) || !hasValidAccountScope(role, session.user.city, session.user.bdName)) return null;
 
   return {
     id: session.user.id,
     username: session.user.username,
-    role: session.user.role,
+    role,
     city: session.user.city,
     bdName: session.user.bdName,
   };

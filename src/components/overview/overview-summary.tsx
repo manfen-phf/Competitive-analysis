@@ -18,7 +18,7 @@ export function OverviewSummary({ snapshot }: { snapshot: OverviewSnapshot }) {
     </section>
     <nav className="overview-quick-actions" aria-label="快捷操作">
       <Link href="/upload" className="overview-action-primary">继续采集</Link>
-      <Link href="/upload" className="overview-action-secondary">查看待确认</Link>
+      <Link href="/upload?view=pending" className="overview-action-secondary">查看待确认</Link>
       <Link href="/dashboard" className="overview-action-secondary">进入竞争分析</Link>
     </nav>
   </>;

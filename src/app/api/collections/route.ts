@@ -4,6 +4,33 @@ import { getSession } from "@/lib/auth";
 import { getPrisma } from "@/lib/db";
 import { canMutateCollection } from "@/lib/permissions";
 
+export async function GET(request: NextRequest) {
+  const user = await getSession();
+  if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });
+  if (request.nextUrl.searchParams.get("status") !== "READY_TO_CONFIRM") {
+    return NextResponse.json({ error: "仅支持查询待确认采集任务" }, { status: 400 });
+  }
+
+  const prisma = await getPrisma();
+  const assignments = user.role === "BD" && user.city && user.bdName
+    ? await prisma.merchantAssignment.findMany({
+      where: { city: user.city, bdName: user.bdName, version: { isActive: true } },
+      select: { merchantId: true },
+      distinct: ["merchantId"],
+    })
+    : [];
+  const where = user.role === "BD"
+    ? { status: "READY_TO_CONFIRM", merchantId: { in: assignments.map((assignment) => assignment.merchantId) } }
+    : { status: "READY_TO_CONFIRM" };
+  const collections = await prisma.collectionTask.findMany({
+    where,
+    include: { uploads: { select: { platform: true, recognitionStatus: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+  return NextResponse.json({ collections });
+}
+
 export async function POST(request: NextRequest) {
   const user = await getSession();
   if (!user) return NextResponse.json({ error: "未登录" }, { status: 401 });

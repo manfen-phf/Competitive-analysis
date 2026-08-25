@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { CollectionWizard } from "@/components/collection/collection-wizard";
@@ -13,6 +14,7 @@ type Merchant = { merchantId: string; merchantName: string; bdName: string };
 type CurrentUser = { role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD"; city: string | null; bdName: string | null };
 type Collection = { id: string; merchantId: string; merchantName: string; city: string; bdName: string; originalDeliveryFee: number };
 type PlatformState = { status: UploadCardStatus; message?: string; recognitionResult?: Record<string, unknown> };
+type PendingCollection = Collection & { createdAt: string; uploads: Array<{ platform: UploadPlatform | null; recognitionStatus: string }> };
 
 const initialImages: Record<UploadPlatform, PlatformState> = { MEITUAN: { status: "EMPTY" }, B_JIA: { status: "EMPTY" } };
 
@@ -26,6 +28,8 @@ function reviewFromRecognition(platform: UploadPlatform, recognition: Record<str
 }
 
 export default function Upload() {
+  const searchParams = useSearchParams();
+  const viewingPendingQueue = searchParams.get("view") === "pending";
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [cities, setCities] = useState<string[]>([]);
   const [city, setCity] = useState("");
@@ -39,6 +43,7 @@ export default function Upload() {
   const [fieldErrors, setFieldErrors] = useState<CollectionFieldErrors>();
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [pendingCollections, setPendingCollections] = useState<PendingCollection[]>([]);
 
   useEffect(() => {
     Promise.all([fetch("/api/auth/me").then((response) => response.json()), fetch("/api/filter-options").then((response) => response.json())]).then(([session, options]) => {
@@ -48,6 +53,14 @@ export default function Upload() {
       if (current?.role === "BD" && current.city) setCity(current.city);
     }).catch(() => setNotice("无法加载当前账号或商家范围，请刷新后重试。"));
   }, []);
+
+  useEffect(() => {
+    if (!viewingPendingQueue) return;
+    fetch("/api/collections?status=READY_TO_CONFIRM")
+      .then(async (response) => response.ok ? response.json() : Promise.reject(new Error((await response.json()).error)))
+      .then((payload) => setPendingCollections(payload.collections ?? []))
+      .catch((error) => setNotice(error.message || "待确认任务加载失败"));
+  }, [viewingPendingQueue]);
 
   useEffect(() => {
     if (!city || collection) { setMerchants([]); return; }
@@ -110,6 +123,15 @@ export default function Upload() {
       setNotice("已确认入库：美团与 B 家各生成一条订单记录。");
     } catch (error) { setNotice(error instanceof Error ? error.message : "确认失败"); } finally { setBusy(false); }
   }
+
+  if (viewingPendingQueue) return <main className="collection-page">
+    <header className="collection-page-header"><div><Link className="workspace-back-link" href="/">返回概览</Link><h1>待确认采集</h1><p>仅展示双平台图片均已识别、尚未正式入库的采集任务。</p></div><Link href="/upload" className="collection-primary">继续采集</Link></header>
+    <section className="collection-task-panel" aria-label="待确认采集列表">
+      <div className="collection-task-heading"><div><h2>待确认队列</h2><p>共 {pendingCollections.length} 个任务，确认后才会进入分析和数据中心。</p></div></div>
+      {pendingCollections.length ? <ul className="overview-activity-list">{pendingCollections.map((task) => <li key={task.id}><div><strong>{task.merchantName}</strong><span>{task.city} · {task.bdName} · 原价配送费 ¥{task.originalDeliveryFee.toFixed(2)}</span><small>{task.uploads.map((upload) => `${upload.platform === "MEITUAN" ? "美团" : "B家"}：${upload.recognitionStatus}`).join(" · ")}</small></div></li>)}</ul> : <p className="collection-notice">暂无待人工确认的采集任务。</p>}
+    </section>
+    {notice ? <p className="collection-notice" role="status">{notice}</p> : null}
+  </main>;
 
   return <main className="collection-page">
     <header className="collection-page-header"><div><Link className="workspace-back-link" href="/">返回概览</Link><h1>双平台订单采集</h1><p>一次采集绑定同一商家、同一 BD 和原价配送费；完成美团与 B 家截图识别后再统一确认。</p></div></header>

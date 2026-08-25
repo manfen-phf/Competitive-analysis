@@ -7,6 +7,7 @@ vi.mock("@/lib/auth", () => ({
   initializeAuthentication: async () => {
     state.initializeCalls += 1;
   },
+  getSession: async () => null,
 }));
 
 import RootLayout from "@/app/layout";

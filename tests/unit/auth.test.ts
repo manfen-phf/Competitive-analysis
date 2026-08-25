@@ -6,7 +6,7 @@ const state = vi.hoisted(() => ({
   cookieDeleted: undefined as string | undefined,
   session: undefined as {
     expiresAt: Date;
-    user: { id: string; username: string; role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD"; city: string | null; bdName: string | null };
+    user: { id: string; username: string; role: string; city: string | null; bdName: string | null };
   } | undefined,
   createdSession: undefined as { data: { tokenHash: string; userId: string; expiresAt: Date } } | undefined,
   deletedSessionWhere: undefined as { tokenHash: string } | undefined,
@@ -206,6 +206,16 @@ describe("getSession", () => {
       city: "玉林",
       bdName: "张三",
     });
+  });
+
+  it("rejects an active session whose persisted role is no longer supported", async () => {
+    state.token = "browser-token";
+    state.session = {
+      expiresAt: new Date("2099-01-01T00:00:00.000Z"),
+      user: { id: "user-1", username: "张三", role: "LEGACY_ADMIN", city: "玉林", bdName: null },
+    };
+
+    await expect(getSession()).resolves.toBeNull();
   });
 });
 
