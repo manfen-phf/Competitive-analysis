@@ -42,7 +42,7 @@ if mode == "transaction":
 else:
     connection.executescript(migration)
 
-for migration in ("0005_collection_duplicate_uploads.sql", "0006_order_red_packet_merchant_share.sql", "0007_image_hash_reservation.sql"):
+for migration in ("0005_collection_duplicate_uploads.sql", "0006_order_red_packet_merchant_share.sql", "0007_image_hash_reservation.sql", "0008_order_data_center.sql"):
     with open(os.path.join(root, "migrations", migration), encoding="utf-8") as source:
         connection.executescript(source.read())
 
@@ -71,6 +71,10 @@ print(json.dumps({
     "orderCount": connection.execute("SELECT COUNT(*) FROM OrderRecord").fetchone()[0],
     "failureCount": connection.execute("SELECT COUNT(*) FROM RecognitionFailure").fetchone()[0],
     "hasMerchantShare": any(column[1] == "platformRedPacketMerchantShare" for column in connection.execute("PRAGMA table_info('OrderRecord')")),
+    "hasMerchantActivity": any(column[1] == "merchantActivity" and column[3] == 1 for column in connection.execute("PRAGMA table_info('OrderRecord')")),
+    "hasUpdatedAt": any(column[1] == "updatedAt" for column in connection.execute("PRAGMA table_info('OrderRecord')")),
+    "auditTable": connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='OrderAuditLog'").fetchone()[0],
+    "auditIndex": connection.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='OrderAuditLog_orderId_createdAt_idx'").fetchone()[0],
     "reservationTable": connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ImageHashReservation'").fetchone()[0],
     "reservationUnique": reservation_unique,
     "foreignKeyViolations": connection.execute("PRAGMA foreign_key_check").fetchall(),
@@ -84,6 +88,10 @@ const expectedBackfill = {
   orderCount: 1,
   failureCount: 1,
   hasMerchantShare: true,
+  hasMerchantActivity: true,
+  hasUpdatedAt: true,
+  auditTable: "OrderAuditLog",
+  auditIndex: "OrderAuditLog_orderId_createdAt_idx",
   reservationTable: "ImageHashReservation",
   reservationUnique: true,
   foreignKeyViolations: [],

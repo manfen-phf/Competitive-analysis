@@ -122,8 +122,10 @@ model OrderRecord {
   city        String
   bdName      String
   uploadedAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   dishPrice Float
   packagingFee Float
+  merchantActivity Float @default(0)
   platformRedPacket Float
   platformRedPacketMerchantShare Float @default(0)
   originalDeliveryFee Float
@@ -135,6 +137,23 @@ model OrderRecord {
   technicalServiceFee Float
   deliveryServiceFee Float
   merchantRate Float
+  audits OrderAuditLog[]
+
+  @@index([city, uploadedAt])
+  @@index([merchantId, uploadedAt])
+}
+
+model OrderAuditLog {
+  id            String      @id @default(cuid())
+  orderId       String
+  order         OrderRecord @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  actorUserId   String
+  actorUsername String
+  beforeJson    String
+  afterJson     String
+  createdAt     DateTime    @default(now())
+
+  @@index([orderId, createdAt])
 }
 
 model RecognitionFailure {
