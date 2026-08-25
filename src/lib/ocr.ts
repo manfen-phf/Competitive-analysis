@@ -5,23 +5,23 @@ const extractionPrompt = `你是外卖订单结算截图的数据抽取器。只
 
 export function extractJsonContent(content: string): unknown {
   const normalized = content.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-  try { return JSON.parse(normalized); } catch { throw new Error("Agnes 未返回有效 JSON"); }
+  try { return JSON.parse(normalized); } catch { throw new Error("千问未返回有效 JSON"); }
 }
 
 export async function recognizeOrderScreenshot(imageUrl: string): Promise<RecognitionResult> {
-  const apiKey = await getRuntimeSecret("AGNES_API_KEY");
-  const model = await getRuntimeSecret("AGNES_MODEL") || "agnes-2.0-flash";
-  if (!apiKey) throw new Error("尚未配置 AGNES_API_KEY，无法开始图片识别");
-  const response = await fetch("https://apihub.agnes-ai.com/v1/chat/completions", {
+  const apiKey = await getRuntimeSecret("QWEN_API_KEY");
+  const model = await getRuntimeSecret("QWEN_MODEL") || "qwen-vl-plus";
+  if (!apiKey) throw new Error("尚未配置 QWEN_API_KEY，无法开始图片识别");
+  const response = await fetch("https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", {
     method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({ model, temperature: 0, max_tokens: 1200, messages: [{ role: "system", content: extractionPrompt }, { role: "user", content: [{ type: "text", text: "请识别这张订单详情截图，并严格按要求返回 JSON。" }, { type: "image_url", image_url: { url: imageUrl } }] }] }),
   });
-  if (!response.ok) throw new Error(`Agnes 识别服务异常（HTTP ${response.status}）`);
+  if (!response.ok) throw new Error(`千问识别服务异常（HTTP ${response.status}）`);
   const body = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
   const content = body.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Agnes 未返回识别结果");
+  if (!content) throw new Error("千问未返回识别结果");
   const parsed = recognitionSchema.safeParse(extractJsonContent(content));
-  if (!parsed.success) throw new Error("Agnes 返回字段不完整或格式无效");
+  if (!parsed.success) throw new Error("千问返回字段不完整或格式无效");
   return parsed.data;
 }
 
