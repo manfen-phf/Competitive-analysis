@@ -5,7 +5,7 @@ import { getPrisma } from "@/lib/db";
 import { imageHash } from "@/lib/dedup";
 import { recognizeOrderScreenshot } from "@/lib/ocr";
 import { canMutateCollection } from "@/lib/permissions";
-import { saveScreenshotToCloudStorage } from "@/lib/cloudbase-storage";
+import { saveScreenshotToR2 } from "@/lib/r2-storage";
 import { assertSupportedScreenshot, imageDataUrl } from "@/lib/storage";
 import { validateRecognition, validateRecognitionPlatform } from "@/lib/validation";
 import { updateCollectionUploadTaskStatus } from "@/lib/collection-upload-state";
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   let uploadId: string | undefined;
   try {
     await updateTask("UPLOADING");
-    const imageFileId = await saveScreenshotToCloudStorage(bytes, file.type, hash);
+    const imageFileId = await saveScreenshotToR2(bytes, file.type, hash);
     const { randomUUID } = await import("node:crypto");
     const upload = await prisma.upload.create({
       data: { collectionId: id, platform, recognitionStatus: "PROCESSING", imageFileId, imageMimeType: file.type, imageHash: hash, imageAccessToken: randomUUID(), storageReference: imageFileId },

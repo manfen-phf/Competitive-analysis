@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { canReadOrder } from "@/lib/permissions";
-import { readScreenshotFromCloudStorage } from "@/lib/cloudbase-storage";
+import { readScreenshotFromR2 } from "@/lib/r2-storage";
 import { isUploadImageTokenValid } from "@/lib/storage";
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
@@ -20,7 +20,12 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
   }
 
   try {
-    const image = await readScreenshotFromCloudStorage(upload.imageFileId);
+    const image = upload.imageFileId
+      ? await readScreenshotFromR2(upload.imageFileId)
+      : upload.legacyImageData && upload.legacyImageData.byteLength > 0
+        ? Buffer.from(upload.legacyImageData)
+        : undefined;
+    if (!image) return new NextResponse("Not found", { status: 404 });
     return new NextResponse(new Uint8Array(image), {
       headers: { "Content-Type": upload.imageMimeType, "Cache-Control": "private, no-store" },
     });

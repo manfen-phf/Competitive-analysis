@@ -32,19 +32,19 @@ INSERT INTO RecognitionFailure (id, uploadId, reason, createdAt)
 VALUES ('failure-1', 'upload-failed', '无法识别', '2026-08-22 10:01:00');
 """)
 
-# Re-run the collection migration over historical data, as it will run in production.
-with open(os.path.join(root, "migrations", "0004_collection_task.sql"), encoding="utf-8") as source:
-    migration = source.read()
+# Re-run the full post-history migration sequence as it will run in production.
+migration_names = ("0004_collection_task.sql", "0005_collection_duplicate_uploads.sql", "0006_order_red_packet_merchant_share.sql", "0007_image_hash_reservation.sql", "0008_order_data_center.sql", "0009_r2_upload_contract.sql")
+migrations = []
+for migration_name in migration_names:
+    with open(os.path.join(root, "migrations", migration_name), encoding="utf-8") as source:
+        migrations.append(source.read())
 
 connection.execute("PRAGMA foreign_keys = ON")
 if mode == "transaction":
-    connection.executescript("BEGIN;\\n" + migration + "\\nCOMMIT;")
+    connection.executescript("BEGIN;\\n" + "\\n".join(migrations) + "\\nCOMMIT;")
 else:
-    connection.executescript(migration)
-
-for migration in ("0005_collection_duplicate_uploads.sql", "0006_order_red_packet_merchant_share.sql", "0007_image_hash_reservation.sql", "0008_order_data_center.sql"):
-    with open(os.path.join(root, "migrations", migration), encoding="utf-8") as source:
-        connection.executescript(source.read())
+    for migration in migrations:
+        connection.executescript(migration)
 
 success = connection.execute("""
 SELECT c.status, u.collectionId, u.platform, u.recognitionStatus, u.legacyImageData IS NOT NULL
@@ -73,6 +73,7 @@ print(json.dumps({
     "hasMerchantShare": any(column[1] == "platformRedPacketMerchantShare" for column in connection.execute("PRAGMA table_info('OrderRecord')")),
     "hasMerchantActivity": any(column[1] == "merchantActivity" and column[3] == 1 for column in connection.execute("PRAGMA table_info('OrderRecord')")),
     "hasUpdatedAt": any(column[1] == "updatedAt" for column in connection.execute("PRAGMA table_info('OrderRecord')")),
+    "hasR2ImageKey": any(column[1] == "imageFileId" for column in connection.execute("PRAGMA table_info('Upload')")),
     "auditTable": connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='OrderAuditLog'").fetchone()[0],
     "auditIndex": connection.execute("SELECT name FROM sqlite_master WHERE type='index' AND name='OrderAuditLog_orderId_createdAt_idx'").fetchone()[0],
     "reservationTable": connection.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='ImageHashReservation'").fetchone()[0],
@@ -90,6 +91,7 @@ const expectedBackfill = {
   hasMerchantShare: true,
   hasMerchantActivity: true,
   hasUpdatedAt: true,
+  hasR2ImageKey: true,
   auditTable: "OrderAuditLog",
   auditIndex: "OrderAuditLog_orderId_createdAt_idx",
   reservationTable: "ImageHashReservation",
@@ -103,7 +105,7 @@ function runMigration(mode: "direct" | "transaction") {
 }
 
 describe("D1 collection-task migration", () => {
-  it("backfills historical uploads and makes historical order numbers nullable", () => {
+  it("backfills historical uploads, makes order numbers nullable, and records a D1/R2 image key", () => {
     expect(runMigration("direct")).toEqual(expectedBackfill);
   });
 

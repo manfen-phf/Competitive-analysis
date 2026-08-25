@@ -86,6 +86,8 @@ model CollectionTask {
 
 model Upload {
   id            String              @id @default(cuid())
+  // New V1 screenshots use an R2 key. Historical D1 rows may only have inline bytes.
+  imageFileId   String?
   legacyImageData Bytes?
   imageMimeType String
   imageHash     String
@@ -122,7 +124,8 @@ model OrderRecord {
   city        String
   bdName      String
   uploadedAt  DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // 0008 added this D1 column without a NOT NULL constraint; keep the ORM contract exact.
+  updatedAt   DateTime? @updatedAt
   dishPrice Float
   packagingFee Float
   merchantActivity Float @default(0)

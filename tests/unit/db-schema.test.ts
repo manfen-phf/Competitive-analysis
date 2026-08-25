@@ -8,7 +8,8 @@ describe("database", () => {
     expect(schema).toContain('provider = "sqlite"');
     expect(schema).not.toContain('provider = "postgresql"');
     expect(schema).toMatch(/merchantActivity\s+Float\s+@default\(0\)/);
-    expect(schema).toMatch(/updatedAt\s+DateTime\s+@updatedAt/);
+    expect(schema).toMatch(/updatedAt\s+DateTime\?\s+@updatedAt/);
+    expect(schema).toMatch(/imageFileId\s+String\?/);
     expect(schema).toMatch(/audits\s+OrderAuditLog\[\]/);
     expect(schema).toContain("model OrderAuditLog {");
     expect(schema).toContain('@relation(fields: [orderId], references: [id], onDelete: Cascade)');
