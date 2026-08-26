@@ -24,9 +24,9 @@
 ## File Structure
 
 - `src/lib/pages-proxy.ts`: pure request validation and fixed-origin request construction.
-- `functions/[[path]].ts`: Cloudflare Pages catch-all HTTP handler that calls the shared proxy helper. It intentionally stays outside Next.js' reserved `pages/` source directory and follows Pages' required root `functions/` layout.
-- `pages-public/index.html`: minimal deploy asset required by Pages; all application paths are handled by the Function.
-- `wrangler.pages.jsonc`: Pages-only Wrangler configuration, separate from existing Worker config.
+- `pages-deploy/functions/[[path]].ts`: Cloudflare Pages catch-all HTTP handler that calls the shared proxy helper. `pages-deploy` is the independent Pages project root, so this follows Pages' required root `functions/` layout without colliding with Next.js routes.
+- `pages-deploy/public/index.html`: minimal deploy asset required by Pages; all application paths are handled by the Function.
+- `pages-deploy/wrangler.jsonc`: Pages-only Wrangler configuration, separate from existing Worker config.
 - `scripts/deploy-pages-proxy.sh`: reproducible Pages deployment script that does not print secrets.
 - `tests/unit/pages-proxy.test.ts`: direct security and request-preservation regression tests.
 - `docs/cloudflare-pages-proxy.md`: operator instructions for preview deploy, secret configuration, verification, custom domain and rollback.
@@ -102,9 +102,9 @@ git commit -m "feat: add fixed-origin Pages proxy contract"
 ### Task 2: Add the Pages Function and deploy configuration
 
 **Files:**
-- Create: `functions/[[path]].ts`
-- Create: `pages-public/index.html`
-- Create: `wrangler.pages.jsonc`
+- Create: `pages-deploy/functions/[[path]].ts`
+- Create: `pages-deploy/public/index.html`
+- Create: `pages-deploy/wrangler.jsonc`
 - Create: `scripts/deploy-pages-proxy.sh`
 - Modify: `package.json`
 
@@ -116,7 +116,7 @@ git commit -m "feat: add fixed-origin Pages proxy contract"
 
 ```ts
 it("exports a Pages onRequest handler and reads only UPSTREAM_ORIGIN", async () => {
-  const module = await import("../../functions/[[path]]");
+  const module = await import("../../pages-deploy/functions/[[path]]");
   expect(typeof module.onRequest).toBe("function");
 });
 ```
@@ -136,7 +136,7 @@ interface Env { UPSTREAM_ORIGIN?: string }
 export const onRequest: PagesFunction<Env> = ({ request, env }) => proxyToFixedOrigin(request, env.UPSTREAM_ORIGIN, fetch);
 ```
 
-Use a separate `wrangler.pages.jsonc` with `pages_build_output_dir: "./pages-public"`, the existing compatibility date and `nodejs_compat`. The shell script must call `wrangler pages deploy --branch main --config wrangler.pages.jsonc`; Pages discovers the root `functions/` directory automatically and the script must not accept arbitrary upstream URLs.
+Use a separate `pages-deploy/wrangler.jsonc` with `pages_build_output_dir: "./public"`, the existing compatibility date and `nodejs_compat`. The shell script must run Wrangler from `pages-deploy`; Pages then discovers that deployment root's `functions/` directory automatically and the script must not accept arbitrary upstream URLs.
 
 - [ ] **Step 4: Run focused tests and static verification**
 
@@ -147,7 +147,7 @@ Expected: Pages proxy tests pass. Record any pre-existing TypeScript diagnostics
 - [ ] **Step 5: Commit the Pages surface**
 
 ```bash
-git add functions/[[path]].ts pages-public/index.html wrangler.pages.jsonc scripts/deploy-pages-proxy.sh package.json tests/unit/pages-proxy.test.ts
+git add pages-deploy/functions/[[path]].ts pages-deploy/public/index.html pages-deploy/wrangler.jsonc scripts/deploy-pages-proxy.sh package.json tests/unit/pages-proxy.test.ts
 git commit -m "feat: add Pages workspace access entry"
 ```
 

@@ -23,7 +23,7 @@ Pages 仅允许转发至：
    bash scripts/deploy-pages-proxy.sh
    ```
 
-部署脚本只会发布 `pages-public` 与根目录的 `functions`，不会发布或修改现有 Worker。
+部署脚本只会发布独立的 `pages-deploy/public` 与 `pages-deploy/functions`，不会发布或修改现有 Worker。
 
 ## 验收顺序
 

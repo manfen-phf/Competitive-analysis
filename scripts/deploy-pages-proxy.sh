@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-pnpm exec wrangler pages deploy \
-  --branch main \
-  --config wrangler.pages.jsonc
+pnpm exec wrangler --cwd pages-deploy pages deploy --branch main

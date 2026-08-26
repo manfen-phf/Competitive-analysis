@@ -1,4 +1,4 @@
-import { proxyToFixedOrigin } from "../src/lib/pages-proxy";
+import { proxyToFixedOrigin } from "../../src/lib/pages-proxy";
 
 interface PagesEnvironment {
   UPSTREAM_ORIGIN?: string;
