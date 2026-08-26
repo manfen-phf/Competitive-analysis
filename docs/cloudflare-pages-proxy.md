@@ -23,7 +23,7 @@ Pages 仅允许转发至：
    bash scripts/deploy-pages-proxy.sh
    ```
 
-部署脚本只会发布 `pages-public` 与 `cloudflare-pages/functions`，不会发布或修改现有 Worker。
+部署脚本只会发布 `pages-public` 与根目录的 `functions`，不会发布或修改现有 Worker。
 
 ## 验收顺序
 

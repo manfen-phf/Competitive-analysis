@@ -42,7 +42,7 @@ describe("Pages access proxy", () => {
   });
 
   it("exposes one Pages catch-all handler", async () => {
-    const module = await import("../../cloudflare-pages/functions/[[path]]");
+    const module = await import("../../functions/[[path]]");
     expect(typeof module.onRequest).toBe("function");
   });
 
