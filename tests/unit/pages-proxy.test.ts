@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
 import { createFixedOriginRequest, proxyToFixedOrigin } from "@/lib/pages-proxy";
 
@@ -41,7 +42,13 @@ describe("Pages access proxy", () => {
   });
 
   it("exposes one Pages catch-all handler", async () => {
-    const module = await import("../../pages/functions/[[path]]");
+    const module = await import("../../cloudflare-pages/functions/[[path]]");
     expect(typeof module.onRequest).toBe("function");
+  });
+
+  it("documents the exact fixed worker origin rather than an arbitrary proxy target", () => {
+    const guide = readFileSync("docs/cloudflare-pages-proxy.md", "utf8");
+    expect(guide).toContain("gx-food-delivery-competition.136010028.workers.dev");
+    expect(guide).toContain("不复制 D1、R2、千问或会话密钥");
   });
 });

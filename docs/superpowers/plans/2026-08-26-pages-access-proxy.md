@@ -24,7 +24,7 @@
 ## File Structure
 
 - `src/lib/pages-proxy.ts`: pure request validation and fixed-origin request construction.
-- `pages/functions/[[path]].ts`: Cloudflare Pages catch-all HTTP handler that calls the shared proxy helper.
+- `cloudflare-pages/functions/[[path]].ts`: Cloudflare Pages catch-all HTTP handler that calls the shared proxy helper. It intentionally stays outside Next.js' reserved `pages/` source directory.
 - `pages-public/index.html`: minimal deploy asset required by Pages; all application paths are handled by the Function.
 - `wrangler.pages.jsonc`: Pages-only Wrangler configuration, separate from existing Worker config.
 - `scripts/deploy-pages-proxy.sh`: reproducible Pages deployment script that does not print secrets.
@@ -102,7 +102,7 @@ git commit -m "feat: add fixed-origin Pages proxy contract"
 ### Task 2: Add the Pages Function and deploy configuration
 
 **Files:**
-- Create: `pages/functions/[[path]].ts`
+- Create: `cloudflare-pages/functions/[[path]].ts`
 - Create: `pages-public/index.html`
 - Create: `wrangler.pages.jsonc`
 - Create: `scripts/deploy-pages-proxy.sh`
@@ -116,7 +116,7 @@ git commit -m "feat: add fixed-origin Pages proxy contract"
 
 ```ts
 it("exports a Pages onRequest handler and reads only UPSTREAM_ORIGIN", async () => {
-  const module = await import("../../pages/functions/[[path]]");
+  const module = await import("../../cloudflare-pages/functions/[[path]]");
   expect(typeof module.onRequest).toBe("function");
 });
 ```
@@ -136,7 +136,7 @@ interface Env { UPSTREAM_ORIGIN?: string }
 export const onRequest: PagesFunction<Env> = ({ request, env }) => proxyToFixedOrigin(request, env.UPSTREAM_ORIGIN, fetch);
 ```
 
-Use a separate `wrangler.pages.jsonc` with `pages_build_output_dir: "./pages-public"`, the existing compatibility date and `nodejs_compat`. The shell script must call `wrangler pages deploy pages-public --project-name gx-food-delivery-competition-web --branch main --functions pages/functions --config wrangler.pages.jsonc`; it must not accept arbitrary upstream URLs.
+Use a separate `wrangler.pages.jsonc` with `pages_build_output_dir: "./pages-public"`, the existing compatibility date and `nodejs_compat`. The shell script must call `wrangler pages deploy pages-public --project-name gx-food-delivery-competition-web --branch main --functions cloudflare-pages/functions --config wrangler.pages.jsonc`; it must not accept arbitrary upstream URLs.
 
 - [ ] **Step 4: Run focused tests and static verification**
 
@@ -147,7 +147,7 @@ Expected: Pages proxy tests pass. Record any pre-existing TypeScript diagnostics
 - [ ] **Step 5: Commit the Pages surface**
 
 ```bash
-git add pages/functions/[[path]].ts pages-public/index.html wrangler.pages.jsonc scripts/deploy-pages-proxy.sh package.json tests/unit/pages-proxy.test.ts
+git add cloudflare-pages/functions/[[path]].ts pages-public/index.html wrangler.pages.jsonc scripts/deploy-pages-proxy.sh package.json tests/unit/pages-proxy.test.ts
 git commit -m "feat: add Pages workspace access entry"
 ```
 
@@ -206,7 +206,7 @@ git commit -m "docs: add Pages access entry operations guide"
 ### Task 4: Create Pages preview and verify the real Cloudflare entry
 
 **Files:**
-- Modify only if deployment output requires an error-path adjustment: `pages/functions/[[path]].ts`, `src/lib/pages-proxy.ts`
+- Modify only if deployment output requires an error-path adjustment: `cloudflare-pages/functions/[[path]].ts`, `src/lib/pages-proxy.ts`
 - Test: `tests/unit/pages-proxy.test.ts`
 
 **Interfaces:**
@@ -253,4 +253,3 @@ Do not commit deployment URLs containing credentials, account bootstrap files, u
 - Spec coverage: Tasks 1–2 implement the safe single-origin forwarding layer; Task 3 documents configuration and rollback; Task 4 performs real Pages deployment and end-to-end reachability checks while preserving the current Worker.
 - Scope check: no business fields, UI behavior, D1 schema, R2 object layout, Qwen configuration or existing Pages projects are changed.
 - Type consistency: `UPSTREAM_ORIGIN` is the only Pages environment value; `createFixedOriginRequest` is consumed by `proxyToFixedOrigin`, which is consumed by the Pages `onRequest` Function.
-
