@@ -39,4 +39,9 @@ describe("Pages access proxy", () => {
     expect(response.headers.get("set-cookie")).toContain("bd_session=new-token");
     await expect(response.text()).resolves.toBe("ok");
   });
+
+  it("exposes one Pages catch-all handler", async () => {
+    const module = await import("../../pages/functions/[[path]]");
+    expect(typeof module.onRequest).toBe("function");
+  });
 });
