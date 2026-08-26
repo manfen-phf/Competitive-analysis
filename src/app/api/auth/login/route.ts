@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   const prisma = await getPrisma();
   await prisma.appSession.deleteMany({ where: { expiresAt: { lte: new Date() } } });
   const user = await prisma.appUser.findUnique({ where: { username: parsed.data.username } });
-  if (!user || !hasValidAccountScope(user.role, user.city, user.bdName) || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
+  if (!user || !user.isActive || !hasValidAccountScope(user.role, user.city, user.bdName) || !(await verifyPassword(parsed.data.password, user.passwordHash))) {
     return NextResponse.json({ error: "用户名或密码错误" }, { status: 401 });
   }
 

@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
     role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD";
     city: string | null;
     bdName: string | null;
+    isActive: boolean;
   },
   sessionUser: null as null | {
     id: string;
@@ -17,6 +18,8 @@ const state = vi.hoisted(() => ({
     bdName: string | null;
   },
   createdUser: undefined as undefined | Record<string, unknown>,
+  users: [] as Array<{ id: string; username: string; role: "SUPER_ADMIN" | "CITY_ADMIN" | "BD"; city: string | null; bdName: string | null; isActive: boolean }>,
+  updatedUser: undefined as undefined | Record<string, unknown>,
   sessionForUserId: undefined as string | undefined,
   cleared: false,
 }));
@@ -25,9 +28,14 @@ vi.mock("@/lib/db", () => ({
   getPrisma: async () => ({
     appUser: {
       findUnique: async () => state.user,
+      findMany: async () => state.users,
       create: async ({ data }: { data: Record<string, unknown> }) => {
         state.createdUser = data;
         return { id: "new-user", ...data };
+      },
+      update: async ({ data }: { data: Record<string, unknown> }) => {
+        state.updatedUser = data;
+        return { id: "edited-user", username: "张三", role: "BD", city: "玉林", bdName: "张三", isActive: true, ...data };
       },
     },
     appSession: {
@@ -58,7 +66,7 @@ vi.mock("@/lib/runtime-secrets", () => ({
 
 import { POST as login } from "@/app/api/auth/login/route";
 import { GET as me } from "@/app/api/auth/me/route";
-import { POST as createUser } from "@/app/api/admin/users/route";
+import { GET as listUsers, PATCH as updateUser, POST as createUser } from "@/app/api/admin/users/route";
 import { POST as importMasterData } from "@/app/api/admin/master-data/route";
 import { safeNextPath } from "@/lib/auth-navigation";
 
@@ -70,9 +78,12 @@ beforeEach(() => {
     role: "BD",
     city: "玉林",
     bdName: "张三",
+    isActive: true,
   };
   state.sessionUser = null;
   state.createdUser = undefined;
+  state.users = [];
+  state.updatedUser = undefined;
   state.sessionForUserId = undefined;
   state.cleared = false;
 });
@@ -99,6 +110,18 @@ describe("login route", () => {
     expect(state.sessionForUserId).toBeUndefined();
   });
 
+  it("rejects a disabled account even when its password is correct", async () => {
+    state.user = { ...state.user!, isActive: false };
+
+    const response = await login(new Request("http://test/api/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ username: "张三", password: "initial-pass" }),
+    }) as never);
+
+    expect(response.status).toBe(401);
+    expect(state.sessionForUserId).toBeUndefined();
+  });
+
   it("returns only safe session fields from the current-user endpoint", async () => {
     state.sessionUser = { id: "user-1", username: "张三", role: "BD", city: "玉林", bdName: "张三" };
 
@@ -119,6 +142,34 @@ describe("login return path", () => {
 });
 
 describe("account creation route", () => {
+  it("lists safe account records for a super administrator only", async () => {
+    state.sessionUser = { id: "admin-1", username: "admin", role: "SUPER_ADMIN", city: null, bdName: null };
+    state.users = [{ id: "bd-1", username: "张三", role: "BD", city: "玉林", bdName: "张三", isActive: true }];
+
+    const response = await listUsers();
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ users: state.users });
+  });
+
+  it("lets a super administrator reset a password or disable an account", async () => {
+    state.sessionUser = { id: "admin-1", username: "admin", role: "SUPER_ADMIN", city: null, bdName: null };
+
+    const response = await updateUser(new Request("http://test/api/admin/users", {
+      method: "PATCH",
+      body: JSON.stringify({ id: "bd-1", password: "new-initial-pass", isActive: false }),
+    }) as never);
+
+    expect(response.status).toBe(200);
+    expect(state.updatedUser).toMatchObject({ passwordHash: "hash:new-initial-pass", isActive: false });
+  });
+
+  it("rejects account management requests from non-super administrators", async () => {
+    state.sessionUser = { id: "bd-1", username: "张三", role: "BD", city: "玉林", bdName: "张三" };
+
+    await expect(listUsers()).resolves.toMatchObject({ status: 403 });
+  });
+
   it("rejects a disabled role value", async () => {
     state.sessionUser = { id: "admin-1", username: "admin", role: "SUPER_ADMIN", city: null, bdName: null };
 

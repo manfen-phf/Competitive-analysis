@@ -27,4 +27,19 @@ describe("D1 authentication migration", () => {
       database.close();
     }
   });
+
+  it("adds an enabled-by-default lifecycle state for every account", () => {
+    const migrationsDirectory = join(process.cwd(), "migrations");
+    const database = new DatabaseSync(":memory:");
+    try {
+      database.exec(readFileSync(join(migrationsDirectory, "0003_workspace_auth.sql"), "utf8"));
+      database.exec(readFileSync(join(migrationsDirectory, "0010_account_lifecycle.sql"), "utf8"));
+      database.exec("INSERT INTO AppUser (id, username, passwordHash, role, city, bdName) VALUES ('u1', 'bd-name', 'hash', 'BD', '玉林', 'BD姓名')");
+
+      const user = database.prepare("SELECT isActive FROM AppUser WHERE id = 'u1'").get() as { isActive: number };
+      expect(user.isActive).toBe(1);
+    } finally {
+      database.close();
+    }
+  });
 });

@@ -10,6 +10,7 @@ const actionDetails: Record<string, string> = {
   "/dashboard": "按城市、BD 或商家查看竞争差异",
   "/health": "查看、核对和导出订单数据",
   "/admin/import": "维护商家和账号主数据",
+  "/admin/users": "创建、重置或停用工作区账号",
 };
 
 export function CommandPalette({ user, open, onClose }: { user: SessionUser; open: boolean; onClose: () => void }) {

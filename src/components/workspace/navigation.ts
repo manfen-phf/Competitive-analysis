@@ -14,6 +14,7 @@ const allNavItems: WorkspaceNavItem[] = [
   { href: "/dashboard", label: "分析", icon: "analysis" },
   { href: "/health", label: "数据中心", icon: "data" },
   { href: "/admin/import", label: "主数据", icon: "master-data" },
+  { href: "/admin/users", label: "账号", icon: "account" },
 ];
 
 export function navItemsFor(user: Pick<SessionUser, "role">): WorkspaceNavItem[] {

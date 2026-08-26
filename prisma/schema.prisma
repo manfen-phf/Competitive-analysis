@@ -16,11 +16,13 @@ model AppUser {
   role         String
   city         String?
   bdName       String?
+  isActive     Boolean      @default(true)
   sessions     AppSession[]
   createdCollections CollectionTask[]
 
   @@index([role, city])
   @@index([bdName])
+  @@index([role, isActive])
 }
 
 model AppSession {

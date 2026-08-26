@@ -22,7 +22,7 @@ describe("workspace navigation", () => {
   });
 
   it("gives a super administrator every workspace destination", () => {
-    expect(navItemsFor(user("SUPER_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health", "/admin/import"]);
+    expect(navItemsFor(user("SUPER_ADMIN")).map((item) => item.href)).toEqual(["/", "/upload", "/dashboard", "/health", "/admin/import", "/admin/users"]);
   });
 
   it("keeps BD mobile navigation to collection destinations and my account", () => {
